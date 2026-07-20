@@ -8,6 +8,7 @@ services:
       - .env
     environment:
       - LOCATION_DB_PATH=/shared/locations.db
+      - LOG_DIR=/data/logs
     volumes:
       - ao-data:/data
       - shared-locations:/shared

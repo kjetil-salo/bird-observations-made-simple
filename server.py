@@ -20,10 +20,34 @@ from urllib.parse import urlparse, parse_qs
 
 # Konfigurerbart log-nivå via miljøvariabel (DEBUG, INFO, WARNING, ERROR)
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+# Loggen skrives alltid til konsollen (Docker/Dozzle live-visning).
+_log_handlers = [logging.StreamHandler()]
+
+# Persistent logg: hvis LOG_DIR er satt, skrives loggen i tillegg til en roterende
+# fil. På Pi peker LOG_DIR til det varige /data-volumet, slik at logghistorikken
+# overlever container-rebuild og restart (Docker json-file-loggen gjør ikke det).
+# Uten LOG_DIR (lokal utvikling) logges kun til konsoll — ingen atferdsendring.
+LOG_DIR = os.environ.get('LOG_DIR')
+if LOG_DIR:
+    try:
+        from logging.handlers import RotatingFileHandler
+        os.makedirs(LOG_DIR, exist_ok=True)
+        _log_handlers.append(RotatingFileHandler(
+            os.path.join(LOG_DIR, 'fugleobs.log'),
+            maxBytes=10 * 1024 * 1024,  # 10 MB per fil
+            backupCount=5,              # behold 5 gamle filer (~60 MB totalt)
+            encoding='utf-8',
+        ))
+    except Exception as e:
+        # Fil-logging er en bonus – aldri la det stoppe oppstart.
+        logging.getLogger('fugleobs').warning(f'Kunne ikke sette opp fil-logging til {LOG_DIR}: {e}')
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=_log_handlers,
 )
 logger = logging.getLogger('fugleobs')
 
