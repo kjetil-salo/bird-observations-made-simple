@@ -105,7 +105,7 @@ def create_ao_site(name, lat, lon, accuracy, login_token, auth_cookie):
         name: Navn på lokasjon
         lat: Breddegrad (WGS84)
         lon: Lengdegrad (WGS84)
-        accuracy: Nøyaktighet i meter (0, 25, 50, 100, 500)
+        accuracy: Nøyaktighet i meter (0, 25, 50, 100, 250, 500)
         login_token: AO logintoken
         auth_cookie: AO .ASPXAUTHNO cookie-verdi
 
