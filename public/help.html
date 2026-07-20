@@ -95,9 +95,10 @@
 
       h2 {
         font-size: 1.1rem;
-        margin: 24px 0 12px;
+        margin: 28px 0 12px;
         color: var(--text);
         font-weight: 600;
+        scroll-margin-top: 16px;
       }
 
       h2:first-of-type {
@@ -158,6 +159,150 @@
         font-size: 0.88rem;
       }
 
+      /* Hopp-til-navigasjon */
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 4px 0 8px;
+      }
+      .toc a {
+        font-size: 0.82rem;
+        color: var(--accent);
+        text-decoration: none;
+        padding: 6px 13px;
+        border-radius: 999px;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        background: var(--accent-soft);
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .toc a:hover {
+        background: rgba(59, 130, 246, 0.22);
+        border-color: rgba(59, 130, 246, 0.5);
+      }
+
+      /* Kom i gang – steg */
+      .quickstart {
+        background: rgba(59, 130, 246, 0.06);
+        border: 1px solid rgba(59, 130, 246, 0.22);
+        border-radius: 14px;
+        padding: 16px 16px 8px;
+        margin: 12px 0 8px;
+      }
+      .qs-step {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin: 0 0 14px;
+      }
+      .qs-num {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 1px;
+      }
+      .qs-step div {
+        font-size: 0.9rem;
+      }
+      .qs-step strong {
+        display: block;
+        margin-bottom: 1px;
+      }
+      .qs-step span {
+        color: var(--muted);
+      }
+
+      /* Legende – kartmarkører */
+      .legend {
+        margin: 12px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+      .legend-row {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-size: 0.88rem;
+      }
+      .dot {
+        flex: 0 0 auto;
+        width: 17px;
+        height: 17px;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+      }
+      .dot-green  { background: #22c55e; }
+      .dot-orange { background: #f97316; }
+      .dot-gray   { background: #94a3b8; }
+      .dot-yellow { background: #eab308; }
+      .dot-red    { background: #ef4444; }
+      .legend-row .lbl { color: var(--muted); }
+      .legend-row strong { color: var(--text); }
+
+      /* Ikon-legende */
+      .icons {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        margin: 12px 0;
+      }
+      .icon-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 11px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: rgba(148, 163, 184, 0.05);
+        font-size: 0.83rem;
+        line-height: 1.35;
+      }
+      .icon-item .ic {
+        font-size: 1.25rem;
+        flex: 0 0 auto;
+        width: 26px;
+        text-align: center;
+      }
+      .icon-item strong {
+        display: block;
+      }
+      .icon-item span {
+        color: var(--muted);
+      }
+
+      /* Modus-pills (visuell demo) */
+      .mode-demo {
+        display: flex;
+        gap: 8px;
+        margin: 10px 0;
+      }
+      .mode-pill {
+        padding: 5px 14px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .mode-felt {
+        background: rgba(74, 222, 128, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(74, 222, 128, 0.4);
+      }
+      .mode-etter {
+        background: rgba(252, 165, 165, 0.12);
+        color: #fca5a5;
+        border: 1px solid rgba(252, 165, 165, 0.4);
+      }
+
       @media (max-width: 480px) {
         body {
           padding: 12px;
@@ -192,6 +337,12 @@
         border-color: #e2e8f0 !important;
         backdrop-filter: none !important;
       }
+      body.theme-light .icon-item {
+        background: #f8fafc;
+      }
+      body.theme-light .dot {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 0 0 1.5px rgba(255, 255, 255, 0.7);
+      }
     </style>
   </head>
   <body>
@@ -209,159 +360,210 @@
           </a>
         </header>
 
-        <div style="text-align:center;margin:8px 0 20px;">
-          <img src="/img/ugle-logo.png" alt="Kortøret ugle" style="max-width:220px;width:100%;opacity:0.92;">
+        <div style="text-align:center;margin:8px 0 16px;">
+          <img src="/img/ugle-logo.png" alt="Kortøret ugle" style="max-width:180px;width:70%;opacity:0.92;">
         </div>
 
-        <p style="font-size:1.05em; margin-bottom:18px;">
+        <p style="font-size:1.05em; margin-bottom:16px;">
           En rask digital feltnotatbok for fugleobservasjoner. Registrer <strong>art, antall og aktivitet</strong> på sekunder, og send observasjonene rett til Artsobservasjoner.no.
         </p>
 
         <div class="note">
-          <strong>Personvern:</strong> Alle observasjoner lagres kun i nettleseren din (localStorage). Ingenting sendes til server f&#248;r du selv velger &#229; publisere.
+          <strong>Personvern:</strong> Alle observasjoner lagres kun i nettleseren din. Ingenting sendes til en server før du selv velger å publisere.
         </div>
 
-        <h2>Kom i gang</h2>
-        <ol>
-          <li><strong>Hent posisjon</strong> &#8211; trykk &#171;Oppdater lokasjon&#187; for &#229; finne lokaliteter i n&#230;rheten. Du kan justere s&#248;keradius (100&#8211;3000 m).</li>
-          <li><strong>Velg lokasjon</strong> &#8211; dropdown viser n&#230;rliggende AO-lokaliteter sortert etter avstand. Trykk &#x1F5FA;&#xFE0F; for &#229; se dem p&#229; kart.</li>
-          <li><strong>S&#248;k art</strong> &#8211; skriv norsk eller latinsk navn. Bruk &#171;Vis underarter&#187; for &#229; inkludere underarter.</li>
-          <li><strong>Sett antall og aktivitet</strong> &#8211; velg aktivitet med hurtigknappene (pills) eller dropdown, og trykk &#10003; for &#229; registrere.</li>
-          <li><strong>Send inn</strong> &#8211; publiser direkte til AO, eller kopier CSV og lim inn manuelt.</li>
-        </ol>
+        <!-- Hopp-til-navigasjon -->
+        <nav class="toc" aria-label="Innhold">
+          <a href="#kom-i-gang">🚀 Kom i gang</a>
+          <a href="#ikoner">🔎 Ikonene</a>
+          <a href="#kart">🗺️ Kart &amp; lokasjoner</a>
+          <a href="#registrere">✓ Registrere</a>
+          <a href="#sende">📤 Sende til AO</a>
+          <a href="#innstillinger">⚙️ Innstillinger</a>
+          <a href="#installer">📱 Installer app</a>
+          <a href="#feilsoking">🩹 Feilsøking</a>
+        </nav>
 
-        <h2>Funksjoner</h2>
+        <h2 id="kom-i-gang">🚀 Kom i gang på et halvt minutt</h2>
+        <p>Fem steg fra tom skjerm til en publisert observasjon:</p>
+        <div class="quickstart">
+          <div class="qs-step">
+            <div class="qs-num">1</div>
+            <div><strong>Hent posisjon</strong><span>Trykk «Bruk GPS» så finner appen lokaliteter i nærheten. Du kan justere søkeradius (100–3000 m).</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-num">2</div>
+            <div><strong>Velg lokalitet</strong><span>Nedtrekkslisten viser steder sortert etter avstand. Trykk 🗺️ for å se dem på kart.</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-num">3</div>
+            <div><strong>Søk art</strong><span>Skriv norsk eller latinsk navn og velg fra lista.</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-num">4</div>
+            <div><strong>Antall og aktivitet</strong><span>Sett antall, velg aktivitet med hurtigknappene, og trykk ✓ for å legge den i lista.</span></div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-num">5</div>
+            <div><strong>Send inn</strong><span>Publiser direkte til Artsobservasjoner, eller kopier CSV og lim inn manuelt.</span></div>
+          </div>
+        </div>
+        <div class="tip">
+          <strong>Ny bruker?</strong> Du trenger <em>ingen</em> innlogging for å registrere og bruke kartet. Innlogging med AO-brukeren din trengs bare hvis du vil publisere med ett trykk eller opprette egne lokaliteter.
+        </div>
 
-        <h3>Interaktivt kart</h3>
-        <p>Trykk &#x1F5FA;&#xFE0F; ved lokasjon for &#229; se alle lokaliteter rundt deg p&#229; et kart.</p>
-        <ul>
-          <li><strong>Gr&#248;nne mark&#248;rer</strong> &#8211; offentlige lokaliteter fra Artsobservasjoner.</li>
-          <li><strong>Oransje mark&#248;rer</strong> &#8211; superlokaliteter, som samler flere underlokaliteter.</li>
-          <li><strong>Gr&#229; mark&#248;rer</strong> &#8211; private lokaliteter opprettet av andre brukere. Kan brukes fritt.</li>
-          <li><strong>Gule mark&#248;rer (&#9733;)</strong> &#8211; dine egne lokaliteter. En ny lokasjon du oppretter vises f&#248;rst som en r&#248;d n&#229;l, og blir gul n&#229;r den er lagret.</li>
-          <li><strong>Polygoner</strong> &#8211; omr&#229;delokaliteter (f.eks. innsjøer) vises med fargede omriss.</li>
-        </ul>
-        <p>Trykk p&#229; en mark&#248;r for &#229; velge lokaliteten.</p>
+        <h2 id="ikoner">🔎 Ikonene i appen</h2>
+        <p>Knappene øverst og i lista gjør dette:</p>
+        <div class="icons">
+          <div class="icon-item"><span class="ic">📍</span><div><strong>Bruk GPS</strong><span>Hent posisjonen din</span></div></div>
+          <div class="icon-item"><span class="ic">🗺️</span><div><strong>Kart</strong><span>Se lokaliteter rundt deg</span></div></div>
+          <div class="icon-item"><span class="ic">➕</span><div><strong>Ny lokasjon</strong><span>Opprett lokalitet (krever innlogging)</span></div></div>
+          <div class="icon-item"><span class="ic">👥</span><div><strong>Medobservatører</strong><span>Legg til dem du var med</span></div></div>
+          <div class="icon-item"><span class="ic">🔒</span><div><strong>Lås besøk</strong><span>Skille flere besøk samme dag</span></div></div>
+          <div class="icon-item"><span class="ic">⚙️</span><div><strong>Innstillinger</strong><span>Tema, innlogging, kopi</span></div></div>
+          <div class="icon-item"><span class="ic">✓</span><div><strong>Registrer</strong><span>Legg observasjonen i lista</span></div></div>
+          <div class="icon-item"><span class="ic">📖</span><div><strong>Hjelp</strong><span>Denne siden</span></div></div>
+        </div>
+
+        <h2 id="kart">🗺️ Kart &amp; lokasjoner</h2>
+        <p>Trykk 🗺️ ved lokasjonsfeltet for å se alle lokaliteter rundt deg på et kart. Fargen på markøren forteller hva slags lokalitet det er:</p>
+        <div class="legend">
+          <div class="legend-row"><span class="dot dot-green"></span><span><strong>Grønn</strong> <span class="lbl">– offentlige lokaliteter fra Artsobservasjoner</span></span></div>
+          <div class="legend-row"><span class="dot dot-orange"></span><span><strong>Oransje</strong> <span class="lbl">– superlokaliteter som samler flere underlokaliteter</span></span></div>
+          <div class="legend-row"><span class="dot dot-gray"></span><span><strong>Grå</strong> <span class="lbl">– private lokaliteter opprettet av andre. Kan brukes fritt</span></span></div>
+          <div class="legend-row"><span class="dot dot-yellow"></span><span><strong>Gul ★</strong> <span class="lbl">– dine egne lokaliteter</span></span></div>
+          <div class="legend-row"><span class="dot dot-red"></span><span><strong>Rød nål</strong> <span class="lbl">– en ny lokasjon du er i ferd med å opprette (blir gul når den er lagret)</span></span></div>
+        </div>
+        <p><strong>Polygoner</strong> (fargede omriss) er områdelokaliteter, f.eks. innsjøer. Trykk på en markør for å velge lokaliteten.</p>
 
         <div class="tip">
-          <strong>Hvorfor private lokasjoner?</strong> Tidligere kunne alle opprette lokaliteter i AO. Denne muligheten ble fjernet, men de eksisterende er der fortsatt. I mange omr&#229;der finnes det f&#229; offisielle lokaliteter &#8211; da er de private uvurderlige. Du kan sl&#229; av visning av private lokasjoner i innstillingene.
+          <strong>Hvorfor private lokasjoner?</strong> Tidligere kunne alle opprette lokaliteter i AO. Muligheten ble fjernet, men de eksisterende er der fortsatt. I mange områder finnes det få offisielle lokaliteter – da er de private uvurderlige. Du kan slå av visning av private lokasjoner i innstillingene.
         </div>
 
         <h3>Opprett ny lokasjon</h3>
-        <p>Mangler det en lokalitet? Trykk <strong>+</strong> ved lokasjonsfeltet (krever at du er innlogget i AO via innstillingene). Du kan ogs&#229; opprette lokasjon direkte fra kartsiden med draggbar mark&#248;r for presis plassering.</p>
+        <p>Mangler det en lokalitet? Trykk <strong>➕</strong> ved lokasjonsfeltet (krever at du er innlogget i AO via innstillingene). Du kan også opprette lokasjon direkte fra kartsiden med en draggbar markør for presis plassering. Standard nøyaktighet er 50 m; du kan velge 25–500 m eller punktobservasjon.</p>
 
-        <h3>Direkte publisering til AO</h3>
-        <p>Logg inn med AO-brukeren din i innstillingene (&#x2699;&#xFE0F;), s&#229; kan du publisere observasjonene med &#233;n knapp &#8211; uten &#229; kopiere CSV manuelt. Appen h&#229;ndterer innlogging og verifisering automatisk.</p>
+        <h2 id="registrere">✓ Registrere observasjoner</h2>
 
-        <h3>Feltmodus vs Etterregistrering</h3>
-        <p>Bytt modus ved &#229; trykke p&#229; pillen i headeren:</p>
+        <h3>Feltmodus vs. etterregistrering</h3>
+        <p>Bytt modus ved å trykke på pillen i headeren:</p>
+        <div class="mode-demo">
+          <span class="mode-pill mode-felt">Felt</span>
+          <span class="mode-pill mode-etter">Etterreg</span>
+        </div>
         <ul>
-          <li><strong style="color:#4ade80">Felt (gr&#248;nn)</strong> &#8211; for registrering i felt. Tidspunkt settes automatisk til &#171;n&#229;&#187;.</li>
-          <li><strong style="color:#fca5a5">Etterreg (r&#248;d)</strong> &#8211; for &#229; registrere fra tidligere tidspunkter. Du velger dato og eventuelt fra/til-klokkeslett.</li>
+          <li><strong style="color:#4ade80">Felt (grønn)</strong> – for registrering i felt. Tidspunkt settes automatisk til «nå».</li>
+          <li><strong style="color:#fca5a5">Etterreg (rød)</strong> – for å registrere fra tidligere tidspunkter. Du velger dato og eventuelt fra/til-klokkeslett.</li>
         </ul>
-        <p>I etterregistreringsmodus kan du s&#248;ke etter stedsnavn med autocomplete direkte fra AO.</p>
+        <p>I etterregistreringsmodus kan du søke etter stedsnavn med autocomplete direkte fra AO.</p>
 
-        <h3>Alder og kj&#248;nn</h3>
-        <p>Felter for alder (Adult, 1K, 2K osv.) og kj&#248;nn (Hann, Hunn, Hunnfarget, I par) vises under artss&#248;ket. Disse er valgfrie og inkluderes i eksporten.</p>
-        <p>Har du satt alder eller kj&#248;nn, vises det som en liten underlinje under arten i observasjonslisten (f.eks. &#171;Adult, Hann&#187;). Rader uten disse verdiene forblir kompakte.</p>
+        <h3>Alder og kjønn</h3>
+        <p>Felter for alder (Adult, 1K, 2K osv.) og kjønn (Hann, Hunn, Hunnfarget, I par) vises under artssøket. Disse er valgfrie og inkluderes i eksporten.</p>
+        <p>Har du satt alder eller kjønn, vises det som en liten underlinje under arten i observasjonslisten (f.eks. «Adult, Hann»). Rader uten disse verdiene forblir kompakte.</p>
 
-        <h3>Medobservat&#248;rer</h3>
-        <p>Trykk &#x1F465; for &#229; &#229;pne medobservat&#248;r-panelet. Her kan du:</p>
+        <h3>Medobservatører</h3>
+        <p>Trykk 👥 for å åpne medobservatør-panelet. Her kan du:</p>
         <ul>
-          <li>Legge til opptil 10 medobservat&#248;rer med autocomplete-s&#248;k mot AO</li>
-          <li>Markere hvem som er aktive &#8211; aktive legges automatisk p&#229; nye observasjoner</li>
-          <li>Masseoppdatere: legg til aktive medobservat&#248;rer p&#229; alle eksisterende observasjoner med &#233;n knapp</li>
+          <li>Legge til opptil 10 medobservatører med autocomplete-søk mot AO</li>
+          <li>Markere hvem som er aktive – aktive legges automatisk på nye observasjoner</li>
+          <li>Masseoppdatere: legg til aktive medobservatører på alle eksisterende observasjoner med én knapp</li>
         </ul>
 
         <h3>Aktivitetspills</h3>
-        <p>Hurtigknappene for aktivitet kan tilpasses i innstillingene. Velg fritt blant alle aktiviteter, endre rekkef&#248;lge, eller sett 0 pills for &#229; kun bruke dropdown.</p>
-        <p>Hver pill kan f&#229; et <strong>kortnavn</strong> (maks 5 tegn) som vises i stedet for det fulle navnet &#8211; da f&#229;r du plass til flere knapper p&#229; skjermen. Skriv ditt eget, eller trykk &#171;Foresl&#229; forkortelser&#187; for &#229; fylle inn fornuftige standardforslag.</p>
+        <p>Hurtigknappene for aktivitet kan tilpasses i innstillingene. Velg fritt blant alle aktiviteter, endre rekkefølge, eller sett 0 pills for å kun bruke dropdown.</p>
+        <p>Hver pill kan få et <strong>kortnavn</strong> (maks 5 tegn) som vises i stedet for det fulle navnet – da får du plass til flere knapper på skjermen. Skriv ditt eget, eller trykk «Foreslå forkortelser» for å fylle inn fornuftige standardforslag.</p>
 
         <h3>Observasjonslisten</h3>
         <ul>
           <li>Observasjoner grupperes automatisk etter lokasjon og sorteres alfabetisk</li>
-          <li>Bruk <strong>+/&#8211;</strong> for &#229; justere antall direkte i listen</li>
-          <li>Trykk p&#229; antallet for &#229; skrive inn et nytt tall</li>
-          <li>Slett med angrefrist p&#229; 5 sekunder</li>
-          <li>Klokkeslett (fra&#8211;til) vises ved stedsnavn. Trykk <strong>klokke-ikonet</strong> ved lokasjonen for &#229; sette fra/til-klokkeslett p&#229; alle observasjonene der p&#229; &#233;n gang.</li>
+          <li>Bruk <strong>+/–</strong> for å justere antall direkte i listen</li>
+          <li>Trykk på antallet for å skrive inn et nytt tall</li>
+          <li>Slett med angrefrist på 5 sekunder</li>
+          <li>Klokkeslett (fra–til) vises ved stedsnavn. Trykk <strong>klokke-ikonet</strong> ved lokasjonen for å sette fra/til-klokkeslett på alle observasjonene der på én gang.</li>
         </ul>
 
-        <h3>L&#229;s bes&#248;k</h3>
-        <p>Samme lokalitet kan bes&#248;kes flere ganger samme dag. Hvert bes&#248;k er en egen gruppe i listen, og l&#229;s-knappen styrer om nye observasjoner skal legges i det p&#229;g&#229;ende bes&#248;ket eller starte et nytt:</p>
+        <h3>Lås besøk</h3>
+        <p>Samme lokalitet kan besøkes flere ganger samme dag. Hvert besøk er en egen gruppe i listen, og lås-knappen styrer om nye observasjoner skal legges i det pågående besøket eller starte et nytt:</p>
         <ul>
-          <li><strong>&#x1F513; &#197;pent bes&#248;k</strong> &#8211; nye observasjoner p&#229; denne lokaliteten legges til her.</li>
-          <li><strong>&#x1F512; Avsluttet bes&#248;k</strong> &#8211; trykk l&#229;sen for &#229; avslutte. Registrerer du senere p&#229; samme sted, starter det et <strong>nytt bes&#248;k</strong> i stedet for &#229; blande seg inn i det gamle. Trykk igjen for &#229; &#229;pne bes&#248;ket p&#229; nytt.</li>
+          <li><strong>🔓 Åpent besøk</strong> – nye observasjoner på denne lokaliteten legges til her.</li>
+          <li><strong>🔒 Avsluttet besøk</strong> – trykk låsen for å avslutte. Registrerer du senere på samme sted, starter det et <strong>nytt besøk</strong> i stedet for å blande seg inn i det gamle. Trykk igjen for å åpne besøket på nytt.</li>
         </ul>
         <div class="tip">
-          <strong>Nyttig n&#229;r:</strong> du gjentar en runde samme dag (f.eks. morgen og kveld p&#229; samme lokalitet) og vil holde tellingene fra hvert bes&#248;k adskilt.
+          <strong>Nyttig når:</strong> du gjentar en runde samme dag (f.eks. morgen og kveld på samme lokalitet) og vil holde tellingene fra hvert besøk adskilt.
         </div>
 
-        <h2>Innstillinger</h2>
-        <p>&#197;pne innstillinger med tannhjulet (&#x2699;&#xFE0F;) &#248;verst.</p>
+        <h2 id="sende">📤 Sende til Artsobservasjoner</h2>
+
+        <h3>Direkte publisering (enklest)</h3>
+        <p>Logg inn med AO-brukeren din i innstillingene (⚙️), så kan du publisere observasjonene med én knapp – uten å kopiere CSV manuelt. Appen håndterer innlogging og verifisering automatisk.</p>
+
+        <h3>Manuell CSV-import</h3>
+        <p>Hvis du ikke bruker direkte publisering, kan du kopiere CSV-en og lime inn i AO:</p>
+        <ol>
+          <li>Trykk «Kopier &amp; åpne AO-import»</li>
+          <li>Import må gjøres via <strong>www.artsobservasjoner.no</strong> (desktop), ikke mobil-versjonen</li>
+          <li>Lim inn hele teksten inkludert overskriftsraden</li>
+        </ol>
+        <p>Mange lokaliteter har <strong>samme navn</strong> (f.eks. «Byparken»). AO kan velge feil sted.</p>
+        <div class="tip">
+          <strong>Tips:</strong> Marker dine vanlige lokaliteter som <strong>favoritter</strong> i AO. Da foreslår AO oftere «din» variant automatisk.
+        </div>
+
+        <h2 id="innstillinger">⚙️ Innstillinger</h2>
+        <p>Åpne innstillinger med tannhjulet (⚙️) øverst.</p>
 
         <h3>Tema</h3>
         <p>Velg utseende med knapperaden:</p>
         <ul>
-          <li><strong>Lyst</strong> &#8211; standard, lettest &#229; lese ute i dagslys.</li>
-          <li><strong>M&#248;rkt</strong> &#8211; sk&#229;nsomt i lite lys.</li>
-          <li><strong>Clean</strong> &#8211; rent, monokromt svart/hvitt uten fargeaksenter.</li>
+          <li><strong>Lyst</strong> – standard, lettest å lese ute i dagslys.</li>
+          <li><strong>Mørkt</strong> – skånsomt i lite lys.</li>
+          <li><strong>Clean</strong> – rent, monokromt svart/hvitt uten fargeaksenter.</li>
         </ul>
 
         <h3>Sikkerhetskopi</h3>
-        <p>Last ned alle observasjonene dine til en fil, og gjenopprett dem senere. Nyttig som trygghet mot datatap hvis du t&#248;mmer nettleseren, bytter enhet eller nettleser &#8211; siden observasjonene ellers bare ligger lokalt.</p>
+        <p>Last ned alle observasjonene dine til en fil, og gjenopprett dem senere. Nyttig som trygghet mot datatap hvis du tømmer nettleseren, bytter enhet eller nettleser – siden observasjonene ellers bare ligger lokalt.</p>
 
         <h3>AO-innlogging</h3>
-        <p>Logg inn med AO-brukeren din for &#229; publisere direkte. Brukernavn og passord lagres <strong>aldri p&#229; serveren</strong> &#8211; bare lokalt p&#229; din enhet, og du velger selv om passordet skal huskes. Trykk <strong>&#171;Fjern innlogging&#187;</strong> for &#229; slette lagret brukernavn, passord og den aktive AO-sesjonen fra denne enheten (nyttig ved feils&#248;king, personvern eller kontobytte). Knappen vises bare n&#229;r du er innlogget.</p>
+        <p>Logg inn med AO-brukeren din for å publisere direkte. Brukernavn og passord lagres <strong>aldri på serveren</strong> – bare lokalt på din enhet, og du velger selv om passordet skal huskes. Trykk <strong>«Fjern innlogging»</strong> for å slette lagret brukernavn, passord og den aktive AO-sesjonen fra denne enheten (nyttig ved feilsøking, personvern eller kontobytte). Knappen vises bare når du er innlogget.</p>
 
         <h3>Nyhetsmeldinger</h3>
-        <p>N&#229;r du &#229;pner appen, vises korte meldinger om nye funksjoner. Har du v&#230;rt borte en stund, ser du alle de nye samlet. Hver melding vises bare &#233;n gang, og aldri for helt nye brukere.</p>
+        <p>Når du åpner appen, vises korte meldinger om nye funksjoner. Har du vært borte en stund, ser du alle de nye samlet. Hver melding vises bare én gang, og aldri for helt nye brukere.</p>
 
-        <h2>Manuell CSV-import til AO</h2>
-        <p>Hvis du ikke bruker direkte publisering, kan du kopiere CSV-en og lime inn i AO:</p>
-        <ol>
-          <li>Trykk &#171;Kopier &amp; &#229;pne AO-import&#187;</li>
-          <li>Import m&#229; gj&#248;res via <strong>www.artsobservasjoner.no</strong> (desktop), ikke mobil-versjonen</li>
-          <li>Lim inn hele teksten inkludert overskriftsraden</li>
-        </ol>
-        <p>Mange lokaliteter har <strong>samme navn</strong> (f.eks. &#171;Byparken&#187;). AO kan velge feil sted.</p>
-        <div class="tip">
-          <strong>Tips:</strong> Marker dine vanlige lokaliteter som <strong>favoritter</strong> i AO. Da foresl&#229;r AO oftere &#171;din&#187; variant automatisk.
-        </div>
+        <h2 id="installer">📱 Installer på telefonen</h2>
+        <p>Appen fungerer best som «app» på hjem-skjermen – da åpner den i fullskjerm uten nettleserlinje.</p>
+        <p><strong>iPhone (Safari):</strong> Trykk på del-ikonet og velg «Legg til på Hjem-skjerm».</p>
+        <p><strong>Android (Chrome):</strong> Trykk på menyen (tre prikker) og velg «Legg til på startskjermen».</p>
 
-        <h2>Offline-st&#248;tte</h2>
-        <p>Appen fungerer uten nettforbindelse. Artss&#248;k bruker en hurtigbuffer, men underarter er kun tilgjengelig online. Observasjoner lagres lokalt uansett.</p>
+        <h3>Offline-støtte</h3>
+        <p>Appen fungerer uten nettforbindelse. Artssøk bruker en hurtigbuffer, men underarter er kun tilgjengelig online. Observasjoner lagres lokalt uansett.</p>
 
-        <h2>Installer p&#229; telefonen</h2>
-        <p><strong>iPhone (Safari):</strong> Trykk p&#229; del-ikonet og velg &#171;Legg til p&#229; Hjem-skjerm&#187;.</p>
-        <p><strong>Android (Chrome):</strong> Trykk p&#229; menyen (tre prikker) og velg &#171;Legg til p&#229; startskjermen&#187;.</p>
-
-        <h2>Lagring</h2>
+        <h3>Lagring av data</h3>
         <ul>
           <li>Observasjonene lagres i <strong>nettleseren din</strong> og forsvinner ikke ved refresh.</li>
           <li>De synkroniseres <strong>ikke</strong> mellom enheter eller nettlesere.</li>
-          <li>Hvis du sletter nettleserdata eller bruker privat modus, mistes observasjonene.</li>
+          <li>Hvis du sletter nettleserdata eller bruker privat modus, mistes observasjonene. Ta en sikkerhetskopi for trygghet.</li>
         </ul>
 
-        <h2>Tastatursnarveier (desktop)</h2>
+        <h3>Tastatursnarveier (desktop)</h3>
         <ul>
-          <li><code>&#8593;</code> / <code>&#8595;</code> &#8211; Naviger i artslisten</li>
-          <li><code>Enter</code> &#8211; Velg art / G&#229; videre / Lagre</li>
-          <li><code>Esc</code> &#8211; Lukk artslisten</li>
+          <li><code>&#8593;</code> / <code>&#8595;</code> – Naviger i artslisten</li>
+          <li><code>Enter</code> – Velg art / Gå videre / Lagre</li>
+          <li><code>Esc</code> – Lukk artslisten</li>
         </ul>
 
-        <h2>Feilsøking</h2>
+        <h2 id="feilsoking">🩹 Feilsøking</h2>
 
         <h3>Posisjon ikke tilgjengelig</h3>
-        <p>Sjekk at nettleseren har tillatelse til &#229; bruke posisjonen din (l&#229;s-ikon i adressefeltet).</p>
+        <p>Sjekk at nettleseren har tillatelse til å bruke posisjonen din (lås-ikon i adressefeltet). På PC/Mac er posisjonen ofte unøyaktig (IP-basert) – appen er laget for mobil i felt.</p>
 
         <h3>Artslisten viser ingenting</h3>
-        <p>Skriv minst 2&#8211;3 tegn. Hvis fortsatt tomt, kan det v&#230;re midlertidig problem med Artsobservasjoner-APIet.</p>
+        <p>Skriv minst 2–3 tegn. Hvis fortsatt tomt, kan det være et midlertidig problem med Artsobservasjoner-APIet.</p>
 
-        <h3>Stedsnavn foresl&#229;s ikke</h3>
-        <p>Forslagene kommer fra Artsobservasjoner. Hvis ingen vises, finnes kanskje ingen registrerte lokaliteter i n&#230;rheten. Du kan opprette en ny lokasjon med +-knappen.</p>
+        <h3>Stedsnavn foreslås ikke</h3>
+        <p>Forslagene kommer fra Artsobservasjoner. Hvis ingen vises, finnes kanskje ingen registrerte lokaliteter i nærheten. Du kan opprette en ny lokasjon med ➕-knappen.</p>
 
         <h2>Om appen</h2>
-        <p>Utviklet av <strong>Kjetil Salomonsen</strong> som et personlig verkt&#248;y for effektiv registrering av fugleobservasjoner i felt.</p>
+        <p>Utviklet av <strong>Kjetil Salomonsen</strong> som et personlig verktøy for effektiv registrering av fugleobservasjoner i felt.</p>
         <p style="font-size: 0.88rem; margin-top: 12px;">Kontakt: <a href="mailto:k@vikebo.com" style="color: var(--accent); text-decoration: none;">k@vikebo.com</a></p>
       </div>
       <footer style="text-align:center;color:#888;font-size:0.9em;padding:12px 0;opacity:0.7;">
