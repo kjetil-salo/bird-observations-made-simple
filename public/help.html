@@ -280,6 +280,45 @@
         color: var(--muted);
       }
 
+      /* Installer-kort */
+      .install-card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px 6px;
+        margin: 12px 0;
+        background: rgba(148, 163, 184, 0.05);
+      }
+      .install-head {
+        font-weight: 600;
+        font-size: 0.92rem;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .install-card ol {
+        margin-top: 6px;
+      }
+      .glyph {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 23px;
+        height: 23px;
+        border-radius: 6px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        vertical-align: -6px;
+        margin: 0 1px;
+      }
+      .glyph svg {
+        width: 15px;
+        height: 15px;
+      }
+      body.theme-light .install-card {
+        background: #f8fafc;
+      }
+
       /* Modus-pills (visuell demo) */
       .mode-demo {
         display: flex;
@@ -411,6 +450,9 @@
         <div class="tip">
           <strong>Ny bruker?</strong> Du trenger <em>ingen</em> innlogging for å registrere og bruke kartet. Innlogging med AO-brukeren din trengs bare hvis du vil publisere med ett trykk eller opprette egne lokaliteter.
         </div>
+        <div class="note">
+          <strong>📱 Tips:</strong> På mobil bør du <a href="#installer" style="color:var(--accent);text-decoration:none;">installere appen på hjem-skjermen</a> – det gir fullskjerm, offline-bruk og raskere oppstart. Anbefales for de fleste.
+        </div>
 
         <h2 id="ikoner">🔎 Ikonene i appen</h2>
         <p>Knappene øverst og i lista gjør dette:</p>
@@ -529,10 +571,36 @@
         <h3>Nyhetsmeldinger</h3>
         <p>Når du åpner appen, vises korte meldinger om nye funksjoner. Har du vært borte en stund, ser du alle de nye samlet. Hver melding vises bare én gang, og aldri for helt nye brukere.</p>
 
-        <h2 id="installer">📱 Installer på telefonen</h2>
-        <p>Appen fungerer best som «app» på hjem-skjermen – da åpner den i fullskjerm uten nettleserlinje.</p>
-        <p><strong>iPhone (Safari):</strong> Trykk på del-ikonet og velg «Legg til på Hjem-skjerm».</p>
-        <p><strong>Android (Chrome):</strong> Trykk på menyen (tre prikker) og velg «Legg til på startskjermen».</p>
+        <h2 id="installer">📱 Installer appen på mobilen</h2>
+        <p><strong>De aller fleste bør «installere» appen.</strong> Det tar ti sekunder og gir en langt bedre opplevelse i felt:</p>
+        <ul>
+          <li><strong>Fullskjerm</strong> uten nettleserlinje – mer plass til observasjonslista.</li>
+          <li><strong>Fungerer offline</strong> – også der du ikke har dekning.</li>
+          <li><strong>Raskere oppstart</strong> og et eget ikon på hjem-skjermen, akkurat som en vanlig app.</li>
+        </ul>
+        <p style="color:var(--muted);font-size:0.85rem;">Det installeres ikke noe fra App Store / Google Play – appen legges bare som en snarvei på hjem-skjermen.</p>
+
+        <div class="install-card">
+          <div class="install-head">🍎 iPhone og iPad (Safari)</div>
+          <ol>
+            <li>Trykk på <strong>Del</strong>-knappen
+              <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span>
+              (firkant med pil opp, nederst eller øverst i Safari).</li>
+            <li>Bla ned og velg <strong>«Legg til på Hjem-skjerm»</strong>.</li>
+            <li>Trykk <strong>«Legg til»</strong> øverst til høyre.</li>
+          </ol>
+        </div>
+
+        <div class="install-card">
+          <div class="install-head">🤖 Android (Chrome)</div>
+          <ol>
+            <li>Trykk på <strong>menyen</strong>
+              <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></span>
+              (tre prikker øverst til høyre).</li>
+            <li>Velg <strong>«Legg til på startskjermen»</strong> eller <strong>«Installer app»</strong>.</li>
+            <li>Bekreft med <strong>«Legg til»</strong>.</li>
+          </ol>
+        </div>
 
         <h3>Offline-støtte</h3>
         <p>Appen fungerer uten nettforbindelse. Artssøk bruker en hurtigbuffer, men underarter er kun tilgjengelig online. Observasjoner lagres lokalt uansett.</p>
