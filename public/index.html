@@ -34,8 +34,8 @@
             <span class="pill mode-pill" id="mode-pill" style="cursor:pointer;" title="Klikk for å bytte modus">Felt</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <a href="/help.html" style="color: var(--muted); text-decoration: none; font-size: 1.2rem; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; display: flex; align-items: center;" title="Hjelp" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--accent-soft)'" onmouseout="this.style.color='var(--muted)'; this.style.background='transparent'">📖</a>
-            <a href="/settings.html" style="color: var(--muted); text-decoration: none; font-size: 1.2rem; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; display: flex; align-items: center;" title="Innstillinger" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--accent-soft)'" onmouseout="this.style.color='var(--muted)'; this.style.background='transparent'">⚙️</a>
+            <a href="/help.html" aria-label="Hjelp" style="color: var(--muted); text-decoration: none; font-size: 1.2rem; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; display: flex; align-items: center;" title="Hjelp" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--accent-soft)'" onmouseout="this.style.color='var(--muted)'; this.style.background='transparent'">📖</a>
+            <a href="/settings.html" aria-label="Innstillinger" style="color: var(--muted); text-decoration: none; font-size: 1.2rem; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; display: flex; align-items: center;" title="Innstillinger" onmouseover="this.style.color='var(--accent)'; this.style.background='var(--accent-soft)'" onmouseout="this.style.color='var(--muted)'; this.style.background='transparent'">⚙️</a>
             <div class="kbd-hint">
               <span class="kbd-key">↑</span><span class="kbd-key">↓</span><span class="kbd-key">Enter</span>
             </div>
@@ -89,8 +89,8 @@
                 .row .icon-btn { height:34px !important; }
               }
             </style>
-            <button class="icon-btn" id="loc-map-btn" title="Åpne kart" style="font-size:1.5em;padding:6px 10px;border:2px solid var(--accent);border-radius:8px;background:var(--accent-soft);color:var(--text);height:38px;min-width:46px;transition:all 0.2s;display:none;box-shadow:0 2px 8px rgba(59,130,246,0.10);">🗺️</button>
-            <button class="icon-btn" id="create-site-btn" title="Opprett ny AO-lokasjon" style="font-size:1.3em;padding:6px 10px;border:2px solid var(--accent);border-radius:8px;background:var(--accent-soft);color:var(--text);height:38px;min-width:46px;transition:all 0.2s;display:none;box-shadow:0 2px 8px rgba(59,130,246,0.10);">➕</button>
+            <button class="icon-btn" id="loc-map-btn" aria-label="Åpne kart" title="Åpne kart" style="font-size:1.5em;padding:6px 10px;border:2px solid var(--accent);border-radius:8px;background:var(--accent-soft);color:var(--text);height:38px;min-width:46px;transition:all 0.2s;display:none;box-shadow:0 2px 8px rgba(59,130,246,0.10);">🗺️</button>
+            <button class="icon-btn" id="create-site-btn" aria-label="Opprett ny AO-lokasjon" title="Opprett ny AO-lokasjon" style="font-size:1.3em;padding:6px 10px;border:2px solid var(--accent);border-radius:8px;background:var(--accent-soft);color:var(--text);height:38px;min-width:46px;transition:all 0.2s;display:none;box-shadow:0 2px 8px rgba(59,130,246,0.10);">➕</button>
           </div>
           <div id="radius-row" class="radius-row">
             <label for="ao-size">Radius</label>
@@ -168,11 +168,11 @@
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
-            <label style="font-size:0.65em;color:#b0b0b0;display:flex;align-items:center;gap:2px;user-select:none;margin:0;">
+            <label style="font-size:0.8em;color:#b0b0b0;display:flex;align-items:center;gap:2px;user-select:none;margin:0;">
               <input type="checkbox" id="include-subtaxa" style="margin:0 4px 0 0;vertical-align:middle;" />
               Vis underarter
             </label>
-            <span id="subtaxa-offline-warning" style="display:none;font-size:0.65em;color:#eab308;line-height:1;">
+            <span id="subtaxa-offline-warning" style="display:none;font-size:0.8em;color:#eab308;line-height:1;">
               ⚠️ Ikke i offline
             </span>
           </div>
@@ -313,39 +313,6 @@
     <script type="module">
       import { VERSION } from './js/version.js';
       document.getElementById('version').textContent = VERSION;
-
-      // Long-press på "Enkel-AO" overskriften → AO Direct
-      const appTitle = document.getElementById('app-title');
-      let longPressTimer = null;
-
-      appTitle.addEventListener('touchstart', (e) => {
-        longPressTimer = setTimeout(() => {
-          window.location.href = '/ao-direct.html';
-        }, 800);
-      });
-
-      appTitle.addEventListener('touchend', () => {
-        if (longPressTimer) clearTimeout(longPressTimer);
-      });
-
-      appTitle.addEventListener('touchcancel', () => {
-        if (longPressTimer) clearTimeout(longPressTimer);
-      });
-
-      // Desktop: mousedown/mouseup for long-press
-      appTitle.addEventListener('mousedown', (e) => {
-        longPressTimer = setTimeout(() => {
-          window.location.href = '/ao-direct.html';
-        }, 800);
-      });
-
-      appTitle.addEventListener('mouseup', () => {
-        if (longPressTimer) clearTimeout(longPressTimer);
-      });
-
-      appTitle.addEventListener('mouseleave', () => {
-        if (longPressTimer) clearTimeout(longPressTimer);
-      });
     </script>
 
     <!-- Modal: Medobservatører -->
@@ -532,7 +499,7 @@
               <input type="checkbox" data-i="${i}" ${it.active ? 'checked' : ''} style="width:20px;height:20px;" />
             </td>
             <td style="text-align:center;padding:4px 0;">
-              <button type="button" data-i="${i}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1em;padding:4px 5px;border-radius:5px;line-height:1;" title="Fjern">✕</button>
+              <button type="button" data-i="${i}" aria-label="Fjern person" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1em;padding:4px 5px;border-radius:5px;line-height:1;" title="Fjern">✕</button>
             </td>`;
           tbody.appendChild(tr);
         });

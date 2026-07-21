@@ -174,3 +174,13 @@ ksalo.no er live (HTTP 200) med tiles for Keycloak, Quarkus-app, .NET-app, Dagen
 - Krav: en bruker som ikke er innlogget skal fortsatt kunne finne og velge et sted via navnesøk (lokal LocationDB)
 - Verifiser at flyten faktisk gir treff uten innlogging – både i Felt- og Etterregistreringsmodus
 - Sjekk at LocationDB (`LOCATION_DB_PATH`) er aktiv i prod (Pi) slik at ikke-innlogget søk har data å søke i
+
+## 19. Vurder å slette ao-direct.html
+
+`ao-direct.html` stammer fra da AO-innlogging ikke skulle vises for vanlige brukere.
+Nå ligger innlogging synlig i innstillingene, og long-press-snarveien til siden er fjernet (v1.38.2).
+
+- Fortsatt referert fra `autocomplete.js` som «Logg inn»-lenke for flere lokaliteter (linje ~112 og ~122)
+- Vurder om den funksjonaliteten kan erstattes av / lenke til innlogging i innstillinger
+- Hvis ja: fjern `ao-direct.html` og oppdater `autocomplete.js`-lenkene
+- Sjekk også `api.js`/`autocomplete.js` for `CustomEvent`-dispatch som notifiserer ao-direct.html i samme tab
