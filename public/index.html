@@ -4,8 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Enkel-AO</title>
+    <meta name="theme-color" content="#0f172a" />
+    <title>Enkel-AO – rask fugleregistrering til Artsobservasjoner</title>
+    <meta name="description" content="Rask digital feltnotatbok for fugleobservasjoner. Registrer art, antall og aktivitet på sekunder – og publiser rett til Artsobservasjoner.no. Fungerer offline." />
+    <!-- Deling på sosiale medier -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Enkel-AO" />
+    <meta property="og:locale" content="nb_NO" />
+    <meta property="og:url" content="https://ao.efugl.no/" />
+    <meta property="og:title" content="Enkel-AO – rask fugleregistrering til Artsobservasjoner" />
+    <meta property="og:description" content="Registrer art, antall og aktivitet på sekunder – og publiser rett til Artsobservasjoner.no. Fungerer offline." />
+    <meta property="og:image" content="https://ao.efugl.no/img/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -265,6 +279,11 @@
               </button>
 <div id="ao-direct-status" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:0.9rem;"></div>
             </div>
+            <!-- CTA for ikke-innloggede: viser at direkte publisering finnes -->
+            <a href="/settings.html" class="btn btn-primary-action" id="ao-login-cta" style="display:none;text-decoration:none;">
+              <span>📡</span>
+              <span>Publiser med ett trykk – logg inn</span>
+            </a>
             <button class="btn btn-secondary-action" id="copy-open-btn" disabled>
               <span>📋</span>
               <span>Kopier &amp; åpne AO-import</span>

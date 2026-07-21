@@ -1390,17 +1390,28 @@ body.theme-light #search:disabled::placeholder {
       .section-lokasjon.coachmark-spot {
         position: relative;
         z-index: 10001;
+      }
+
+      /* Chromium klipper legend-toppen hvis fieldsetet selv får solid bakgrunn
+         og box-shadow. Spotlight-bakgrunn og ring ligger derfor på en ::before
+         som i tillegg strekker seg litt over legenden så den får luft. */
+      .section-lokasjon.coachmark-spot::before {
+        content: '';
+        position: absolute;
+        inset: -13px -5px -5px -5px;
+        z-index: -1;
+        border-radius: 14px;
         /* Solid bakgrunn så den mørke dim-overlayen ikke skinner gjennom
            den halvgjennomsiktige seksjonen — spotlighten skal poppe. */
         background: #111c33;
         box-shadow:
           0 0 0 3px rgba(59, 130, 246, 0.9),
-          0 0 26px rgba(59, 130, 246, 0.5) !important;
+          0 0 26px rgba(59, 130, 246, 0.5);
         animation: coachmark-pulse 2s ease-in-out infinite;
       }
 
-      body.theme-light .section-lokasjon.coachmark-spot {
-        background: #eef4ff !important;
+      body.theme-light .section-lokasjon.coachmark-spot::before {
+        background: #eef4ff;
       }
 
       .coachmark-bubble {
@@ -1472,7 +1483,7 @@ body.theme-light #search:disabled::placeholder {
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .section-lokasjon.coachmark-spot { animation: none; }
+        .section-lokasjon.coachmark-spot::before { animation: none; }
         .coachmark-bubble { animation: none; }
       }
 

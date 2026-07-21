@@ -8,31 +8,35 @@
   <!-- Bakgrunn -->
   <rect width="64" height="64" rx="12" fill="url(#bg)"/>
 
-  <!-- Fugl i profil -->
-  <!-- Hode -->
-  <circle cx="40" cy="24" r="8" fill="#e5e7eb"/>
-
   <!-- Nebb -->
-  <path d="M 47 24 L 53 23 L 52 25 Z" fill="#fbbf24"/>
+  <path d="M 52 21.5 L 61 24 L 52 27 Z" fill="#fbbf24"/>
+
+  <!-- Kropp + hode som én silhuett, hale spisser mot venstre -->
+  <path d="M 8 29.5
+           L 23 26
+           C 25.5 15.5 33 10.5 41 10.5
+           C 48.5 10.5 53.5 15.5 53.5 22
+           C 53.5 24.5 53 26.5 52 28
+           C 49 36.5 42 43 33 43.5
+           C 28 43.8 24 41.5 21.8 38
+           L 8 32
+           Z" fill="#e5e7eb"/>
+
+  <!-- Vinge (foldet, peker bakover mot halen) -->
+  <path d="M 41 23
+           Q 43 29 37 33.5
+           Q 30 38 21 33
+           Q 20 31.5 22 30
+           Q 32 29 36 24.5
+           Q 38.5 22 41 23
+           Z" fill="#cbd5e1"/>
 
   <!-- Øye -->
-  <circle cx="42" cy="23" r="1.5" fill="#0f172a"/>
-
-  <!-- Kropp -->
-  <ellipse cx="30" cy="32" rx="12" ry="10" fill="#e5e7eb"/>
-
-  <!-- Vinge (opp) -->
-  <path d="M 30 28 Q 22 20 18 18 Q 20 22 24 26 Q 28 30 30 32 Z" fill="#cbd5e1" opacity="0.9"/>
-
-  <!-- Hale -->
-  <path d="M 18 32 Q 14 30 12 34 Q 14 36 18 34 Q 20 33 20 32 Z" fill="#cbd5e1"/>
+  <circle cx="46.5" cy="19.5" r="2" fill="#0f172a"/>
 
   <!-- Ben -->
-  <line x1="28" y1="42" x2="28" y2="46" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="32" y1="42" x2="32" y2="46" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
-
-  <!-- Fot venstre -->
-  <path d="M 26 46 L 28 46 L 30 46" stroke="#fbbf24" stroke-width="1" stroke-linecap="round" fill="none"/>
-  <!-- Fot høyre -->
-  <path d="M 30 46 L 32 46 L 34 46" stroke="#fbbf24" stroke-width="1" stroke-linecap="round" fill="none"/>
+  <line x1="30" y1="43.5" x2="30" y2="49" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="36" y1="43.5" x2="36" y2="49" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M 27.5 49 L 32.5 49" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+  <path d="M 33.5 49 L 38.5 49" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round" fill="none"/>
 </svg>

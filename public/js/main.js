@@ -122,6 +122,9 @@ function updateAoDirectVisibility() {
   if (!dom.aoDirectRow) return;
   const hasCredentials = localStorage.getItem('ao_username') && localStorage.getItem('ao_password');
   dom.aoDirectRow.style.display = hasCredentials ? 'block' : 'none';
+  // Uten innlogging: vis CTA så nye brukere ser at direkte publisering finnes
+  const loginCta = document.getElementById('ao-login-cta');
+  if (loginCta) loginCta.style.display = hasCredentials ? 'none' : 'flex';
 }
 
 function commitFromActivity() {
