@@ -53,8 +53,7 @@ logger = logging.getLogger('fugleobs')
 
 from src.api_handlers import handle_species_search, handle_reverse_geocoding, handle_ao_sites_search, login_to_ao, mask_token
 from src.html_templates import generate_stats_login_page, generate_stats_page, generate_error_page
-from src.sqlite_log import log_view as log_view_to_sqlite, log_export
-from src.supabase_log import log_view_to_supabase, log_export_to_supabase, get_stats_from_supabase
+from src import stats_store
 from src.ao_import_httpx import post_with_curl
 
 # Lokal lokasjons-database (feature toggle via LOCATION_DB_PATH)
@@ -139,8 +138,7 @@ class Handler(SimpleHTTPRequestHandler):
             export_type = body.get('type', 'unknown')
             if export_type not in ('copy_open', 'direct'):
                 export_type = 'unknown'
-            log_export(export_type)
-            log_export_to_supabase(export_type)
+            stats_store.log_export(export_type)
         except Exception as e:
             logger.warning(f"[log-export] Feil: {e}")
         self._send_json({'ok': True})
@@ -248,15 +246,8 @@ class Handler(SimpleHTTPRequestHandler):
             _stats['per_ua'][user_agent] = _stats['per_ua'].get(user_agent, 0) + 1
             _stats['devices'].add(device_id)
 
-        # Logg til SQLite og Supabase
-        try:
-            log_view_to_sqlite(real_ip, user_agent, device_id=device_id)
-        except Exception as e:
-            logger.warning(f"[SQLite] Feil ved logging: {e}")
-        try:
-            log_view_to_supabase(real_ip, user_agent, device_id=device_id)
-        except Exception as e:
-            logger.warning(f"[Supabase] Feil ved logging: {e}")
+        # Logg til alle backends (fasaden håndterer SQLite + Supabase)
+        stats_store.log_view(real_ip, user_agent, device_id=device_id)
 
         # Sett cookie hvis ny enhet (2 år levetid)
         if set_cookie:
@@ -561,13 +552,8 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_html_response(generate_stats_login_page())
             return
         
-        # Hent data – Supabase først, deretter SQLite som fallback
-        stats = get_stats_from_supabase()
-        source = "Supabase"
-        if not stats:
-            from src.sqlite_log import get_stats
-            stats = get_stats()
-            source = "SQLite"
+        # Hent data via fasaden (SQLite primær, Supabase fallback)
+        stats, source = stats_store.get_stats()
         if stats:
             html = generate_stats_page(
                 stats["recent_ips"],
@@ -582,6 +568,7 @@ class Handler(SimpleHTTPRequestHandler):
                 exports=stats["exports"],
                 trend_30d=stats.get("trend_30d"),
                 unique_devices_per_day=stats.get("unique_devices_per_day"),
+                unique_users_per_week=stats.get("unique_users_per_week"),
             )
         else:
             # Fallback til in-memory statistikk

@@ -35,7 +35,7 @@ def generate_stats_login_page():
 """
 
 
-def generate_stats_page(recent_ips, per_ua, total, per_device=None, per_os=None, per_browser=None, total_unique_ips=0, source="Supabase", total_unique_devices=0, exports=None, trend_30d=None, trend_7d=None, unique_devices_per_day=None):
+def generate_stats_page(recent_ips, per_ua, total, per_device=None, per_os=None, per_browser=None, total_unique_ips=0, source="Supabase", total_unique_devices=0, exports=None, trend_30d=None, trend_7d=None, unique_devices_per_day=None, unique_users_per_week=None):
     """Generer statistikk-side med data fra enten Supabase eller in-memory."""
     per_device = per_device or {}
     per_os = per_os or {}
@@ -137,6 +137,50 @@ def generate_stats_page(recent_ips, per_ua, total, per_device=None, per_os=None,
         </script>
         '''
 
+    # Ukentlige unike brukere (device_id, fallback IP) – siste uke er pågående
+    unique_users_per_week = unique_users_per_week or []
+    weekly_section = ""
+    if unique_users_per_week:
+        w_labels = [uke[5:] for uke, _ in unique_users_per_week]  # MM-DD
+        w_values = [cnt for _, cnt in unique_users_per_week]
+        # Grå farge på siste (pågående) uke, grønn ellers
+        w_colors = ["rgba(34, 197, 94, 0.6)"] * len(w_values)
+        w_borders = ["rgba(34, 197, 94, 1)"] * len(w_values)
+        if w_colors:
+            w_colors[-1] = "rgba(148, 163, 184, 0.5)"
+            w_borders[-1] = "rgba(148, 163, 184, 1)"
+        weekly_section = f'''
+        <div class="section-title">Ukentlige unike brukere (siste {len(w_values)} uker)</div>
+        <div style="color:#888;font-size:0.85em;margin-bottom:0.5em;">Unik = device-cookie (fallback IP). Siste stolpe er pågående uke.</div>
+        <canvas id="weeklyChart" style="width:100%;max-height:240px;"></canvas>
+        <script>
+        (function() {{
+            var ctx = document.getElementById('weeklyChart').getContext('2d');
+            new Chart(ctx, {{
+                type: 'bar',
+                data: {{
+                    labels: {w_labels},
+                    datasets: [{{
+                        label: 'Unike brukere',
+                        data: {w_values},
+                        backgroundColor: {w_colors},
+                        borderColor: {w_borders},
+                        borderWidth: 1
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    plugins: {{ legend: {{ display: false }} }},
+                    scales: {{
+                        x: {{ ticks: {{ maxRotation: 60, minRotation: 45, font: {{ size: 10 }} }} }},
+                        y: {{ beginAtZero: true, ticks: {{ stepSize: 10 }} }}
+                    }}
+                }}
+            }});
+        }})();
+        </script>
+        '''
+
     trend_section = ""
     if trend_30d:
         labels = [dato for dato, _ in trend_30d]
@@ -174,7 +218,7 @@ def generate_stats_page(recent_ips, per_ua, total, per_device=None, per_os=None,
 
     # Chart.js lastes én gang hvis noen av grafene skal vises
     chartjs_load = ''
-    if unique_section or trend_section:
+    if unique_section or trend_section or weekly_section:
         chartjs_load = '<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>'
 
     return f"""
@@ -213,6 +257,7 @@ def generate_stats_page(recent_ips, per_ua, total, per_device=None, per_os=None,
         </div>
 
         {chartjs_load}
+        {weekly_section}
         {unique_section}
         {trend_section}
         <div class="section-title">Siste 10 IP-adresser</div>

@@ -81,10 +81,66 @@ def get_stats_from_supabase():
             "exports": data.get("exports") or {},
             "trend_30d": trend_30d,
             "unique_devices_per_day": unique_devices_per_day,
+            "unique_users_per_week": get_weekly_unique_users(),
         }
     except Exception as e:
         logger.warning(f"[Supabase] Feil ved henting av stats: {e}")
         return None
+
+
+def get_weekly_unique_users(weeks: int = 26):
+    """Ukentlige unike brukere (ISO-uke, mandag).
+
+    Identitet = device_id (UUID-cookie) der den finnes, ellers fallback til IP.
+    Ekskluderer localhost. Henter kun de siste `weeks` ukene for å begrense last.
+    Returnerer liste av (uke_mandag_iso, antall) sortert stigende, eller [].
+    """
+    if not supabase:
+        return []
+    try:
+        from datetime import datetime, date, timedelta
+        today = date.today()
+        this_monday = today - timedelta(days=today.weekday())
+        cutoff = (this_monday - timedelta(weeks=weeks - 1)).isoformat()
+
+        skip_ip = {"127.0.0.1", "::1", "localhost"}
+        week_sets = {}
+        step = 1000
+        start = 0
+        while True:
+            res = (
+                supabase.table("stats")
+                .select("ip,timestamp,device_id")
+                .gte("timestamp", cutoff)
+                .order("id")
+                .range(start, start + step - 1)
+                .execute()
+            )
+            batch = res.data or []
+            for row in batch:
+                ip = (row.get("ip") or "").strip()
+                if ip in skip_ip:
+                    continue
+                ts = row.get("timestamp")
+                if not ts:
+                    continue
+                d = datetime.fromisoformat(ts).date()
+                monday = (d - timedelta(days=d.weekday())).isoformat()
+                ident = row.get("device_id") or ("ip:" + ip)
+                week_sets.setdefault(monday, set()).add(ident)
+            if len(batch) < step:
+                break
+            start += step
+
+        # Fyll ut tomme uker slik at grafen blir sammenhengende
+        result = []
+        for i in range(weeks):
+            wk = (this_monday - timedelta(weeks=weeks - 1 - i)).isoformat()
+            result.append((wk, len(week_sets.get(wk, ()))))
+        return result
+    except Exception as e:
+        logger.warning(f"[Supabase] Feil ved henting av ukentlige unike brukere: {e}")
+        return []
 
 
 def log_export_to_supabase(export_type: str) -> bool:

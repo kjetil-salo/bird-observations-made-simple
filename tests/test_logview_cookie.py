@@ -26,8 +26,6 @@ def test_logview_sets_device_cookie(monkeypatch):
     from src import sqlite_log
     import server as server_mod
     monkeypatch.setattr(sqlite_log, 'log_view', lambda ip, ua, device_id='': True)
-    monkeypatch.setattr(server_mod, 'log_view_to_sqlite', lambda ip, ua, device_id='': True)
-
     _stats['total'] = 0
     _stats['per_ip'] = {}
     _stats['per_ua'] = {}
@@ -55,8 +53,6 @@ def test_logview_reuses_existing_cookie(monkeypatch):
     from src import sqlite_log
     import server as server_mod
     monkeypatch.setattr(sqlite_log, 'log_view', lambda ip, ua, device_id='': True)
-    monkeypatch.setattr(server_mod, 'log_view_to_sqlite', lambda ip, ua, device_id='': True)
-
     _stats['total'] = 0
     _stats['per_ip'] = {}
     _stats['per_ua'] = {}
@@ -87,8 +83,6 @@ def test_logview_tracks_unique_devices(monkeypatch):
     from src import sqlite_log
     import server as server_mod
     monkeypatch.setattr(sqlite_log, 'log_view', lambda ip, ua, device_id='': True)
-    monkeypatch.setattr(server_mod, 'log_view_to_sqlite', lambda ip, ua, device_id='': True)
-
     _stats['total'] = 0
     _stats['per_ip'] = {}
     _stats['per_ua'] = {}

@@ -135,6 +135,24 @@ def get_stats() -> dict:
                     unique_map[d] = row["cnt"]
             unique_devices_per_day = list(unique_map.items())
 
+            # Ukentlige unike brukere (device_id, fallback IP) – siste 26 uker, ISO-uke (mandag)
+            weeks = 26
+            this_monday = today - timedelta(days=today.weekday())
+            week_counts = {}
+            for row in conn.execute(
+                "SELECT DATE(ts, '-' || ((strftime('%w', ts) + 6) % 7) || ' days') AS uke, "
+                "COUNT(DISTINCT COALESCE(NULLIF(device_id, ''), 'ip:' || ip)) AS cnt "
+                "FROM stats WHERE ip NOT IN ('127.0.0.1', '::1', 'localhost') "
+                "AND ts >= DATE('now', '-' || ? || ' days') GROUP BY uke ORDER BY uke",
+                (weeks * 7,)
+            ).fetchall():
+                week_counts[row["uke"]] = row["cnt"]
+            unique_users_per_week = [
+                ((this_monday - timedelta(weeks=weeks - 1 - i)).isoformat(),
+                 week_counts.get((this_monday - timedelta(weeks=weeks - 1 - i)).isoformat(), 0))
+                for i in range(weeks)
+            ]
+
         return {
             "total": total,
             "total_unique_ips": total_unique_ips,
@@ -145,6 +163,7 @@ def get_stats() -> dict:
             "exports": exports,
             "trend_30d": trend_30d,
             "unique_devices_per_day": unique_devices_per_day,
+            "unique_users_per_week": unique_users_per_week,
         }
     except Exception as e:
         logger.warning(f"[SQLite] Feil ved henting av stats: {e}")

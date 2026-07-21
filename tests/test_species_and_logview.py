@@ -73,7 +73,6 @@ def test_logview_monkeypatch(monkeypatch):
     from src import sqlite_log
     import server as server_mod
     monkeypatch.setattr(sqlite_log, 'log_view', fake_log_view)
-    monkeypatch.setattr(server_mod, 'log_view_to_sqlite', fake_log_view)
 
     port = 38004
     srv = start_server(port)
