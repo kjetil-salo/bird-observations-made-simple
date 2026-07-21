@@ -782,7 +782,17 @@ class Handler(SimpleHTTPRequestHandler):
                     and os.path.isfile(real_candidate)):
                 self.path = '/public/' + parsed.path.lstrip('/')
             else:
-                # Fallback til index.html
+                # Filaktige stier (med filendelse) som ikke finnes skal gi ekte 404.
+                # Index.html-fallback her ble liggende i Cloudflare-cachen (4 t):
+                # et manglende bilde ble servert som appen uten CSS.
+                _, ext = os.path.splitext(parsed.path)
+                if ext:
+                    self.send_response(404)
+                    self.send_header('Cache-Control', 'no-store')
+                    self._cache_header_set = True
+                    self.end_headers()
+                    return
+                # Pene URL-er uten filendelse faller tilbake til index.html
                 self.path = '/public/index.html'
         
         return super().do_GET()
@@ -803,6 +813,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         """Legg til Cache-Control headers for å unngå aggressive mobilcache."""
+        # Respekter eksplisitt satt Cache-Control (f.eks. no-store på 404)
+        if getattr(self, '_cache_header_set', False):
+            self._cache_header_set = False
+            super().end_headers()
+            return
         # HTML-filer: Alltid revalider med server (inkluderer root path /)
         if self.path.endswith('.html') or self.path == '/' or self.path == '/public/index.html':
             self.send_header('Cache-Control', 'no-cache, must-revalidate')

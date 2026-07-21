@@ -238,3 +238,23 @@ def test_ao_sites_super_via_local_db_parent(monkeypatch):
     hylkjebukta = next(s for s in sites if s.get('id') == 2)
     assert hylkje.get('isSuper') is True, 'Hylkje skal være super via lokal DB parent_id'
     assert not hylkjebukta.get('isSuper'), 'Hylkjebukta er underlokasjon, ikke super'
+
+
+def test_manglende_fil_gir_404_ikke_index_fallback():
+    """Filaktige stier (med filendelse) som ikke finnes skal gi ekte 404.
+    Index.html-fallback for slike ble cachet som HTML av Cloudflare (4 t),
+    slik at et manglende bilde ble servert som appen uten CSS."""
+    port = 38090
+    srv = start_server(port)
+    time.sleep(0.05)
+
+    r = requests.get(f'http://127.0.0.1:{port}/img/finnes-ikke.png')
+    assert r.status_code == 404
+    assert r.headers.get('Cache-Control') == 'no-store'
+
+    # Pene URL-er uten filendelse skal fortsatt gi appen (SPA-fallback)
+    r2 = requests.get(f'http://127.0.0.1:{port}/en-ukjent-side')
+    assert r2.status_code == 200
+    assert 'text/html' in r2.headers.get('Content-Type', '')
+
+    srv.shutdown()
