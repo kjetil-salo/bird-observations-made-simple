@@ -108,6 +108,15 @@
 
 ### 🔴 Høy prioritet
 
+#### Brukerkommunikasjon:
+- **Tilbakemeldingskanal (feil + ønsker)** — **✅ FASE 1 IMPLEMENTERT (2026-07-23, v1.39.0):** Lavterskel skjema uten innlogging. Bruker melder feil/ønske/annet + valgfri epost, får et saksnummer (`AO-XXXXX`, kort tilfeldig kode) som kvittering på skjerm. Appversjon + enhet/nettleser lagres automatisk for feilsøking.
+  - **Arkitektur:** `POST /api/feedback` → `src/feedback_store.py` (SQLite i samme `stats.db`, følger `sqlite_log`-mønsteret). Key-beskyttet admin-visning på `/feedback?key=STATS_KEY` med statusfilter (ny/under_arbeid/løst/avvist) og statusendring. Lenker fra footer (index) + Innstillinger. Spam-vern: honeypot-felt + per-IP throttling (5/10 min) + lengdegrenser. Tester i `tests/test_feedback.py`.
+  - **Bevisst valg:** Ingen epostutsendelse i fase 1 — vi har ingen sendefunksjon, og det ville dratt inn epost-provider/hemmeligheter/deliverability. Saksnummer på skjerm er kvittering nok; eier leser saker i admin og svarer manuelt fra egen epost (mailto-lenke med saksnr i emnet finnes i admin-visningen).
+  - **✅ FASE 2 – EIER-VARSEL IMPLEMENTERT (2026-07-23):** `src/email_notify.py` sender et varsel til eier ved ny sak (best effort, i bakgrunnstråd så brukersvaret ikke forsinkes). **`Reply-To` settes til melderens epost** → «Svar» går rett til brukeren («starter på forms, tas videre på epost»). Provider auto-detekteres fra env og er ren no-op hvis ukonfigurert (samme filosofi som valgfri Supabase).
+    - **Oppsett (env-vars, settes utenfor repo på Pi/Fly):** `FEEDBACK_NOTIFY_TO` (din epost — uten denne sendes ingenting), `FEEDBACK_NOTIFY_FROM` (verifisert avsender), og **enten** `RESEND_API_KEY` **eller** `SMTP2GO_API_KEY`. Begge providere støttes; Resend prioriteres hvis begge er satt.
+    - **Ikke gjort (bevisst):** kvittering-epost til melder (saksnr på skjerm holder), og Supabase-speiling av feedback (i dag kun SQLite/Pi).
+  - **🔜 FASE 3 (valgfritt):** Statusoppslag på saksnummer (melder kan følge opp), evt. enkel svartråd.
+
 #### Tekniske forbedringer:
 - ✅ **Forbedret feilhåndtering**: Tre separate meldinger for server nede, AO nede og offline. Status-rad med lenke til innstillinger. Underarter deaktiveres ved fallback. Mock-server for testing (`mock/nominatim_app_timeout.py`).
 
@@ -143,6 +152,10 @@
 - **Backup/export**: Eksporter hele observasjonshistorikken
 - **Ytterligere Supabase-funksjoner**: Bruke Supabase til mer enn bare statistikk
 - **Server-lagring av brukerinnstillinger (multi-enhet)**: La brukeren synke innstillinger (aktivitets-pills, forkortelser, tema, medobservatører, radius m.m.) på tvers av enheter. Naturlig nøkkel: AO `userId` (allerede tilgjengelig ved innlogging), lagret i Supabase. Vurder synk-strategi (siste-skriver-vinner vs. flett), og hva som IKKE skal synkes (aldri passord). Henger sammen med innloggings-løftet — når bruker først er innlogget, kan innstillinger følge kontoen.
+
+#### Ønsker for fremtiden (kan være komplekst):
+- **Redigering av allerede innlagte observasjoner**: La brukeren endre observasjoner som allerede er publisert til AO. **Kun for innloggede brukere** (krever AO-sesjon for å gjøre endringer mot AO). Må undersøke hvilke AO-endepunkter som finnes for å hente egne observasjoner og oppdatere/slette dem. Grensesnitt: liste over egne siste observasjoner → velg → rediger felt → send oppdatering. Merk at `public/edit.html` i dag redigerer lokale (ikke-publiserte) observasjoner før import — dette er en annen flyt (endre etter publisering).
+- **Bilder på observasjoner**: Mulighet for å legge ved bilde(r) til en observasjon en gang i fremtiden. KAN være komplisert (opplasting, lagring/hosting, AO-støtte for bildevedlegg, mobilkamera-flyt, størrelse/komprimering, personvern). Tas med som ønske for fremtiden — ikke prioritert nå.
 
 ---
 

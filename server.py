@@ -52,8 +52,11 @@ logging.basicConfig(
 logger = logging.getLogger('fugleobs')
 
 from src.api_handlers import handle_species_search, handle_reverse_geocoding, handle_ao_sites_search, login_to_ao, mask_token
-from src.html_templates import generate_stats_login_page, generate_stats_page, generate_error_page
+from src.html_templates import generate_stats_login_page, generate_stats_page, generate_error_page, generate_feedback_admin_page
 from src import stats_store
+from src import feedback_store
+from src import email_notify
+from src.utils import parse_user_agent
 from src.ao_import_httpx import post_with_curl
 
 # Lokal lokasjons-database (feature toggle via LOCATION_DB_PATH)
@@ -77,6 +80,13 @@ _stats = {
     'per_ua': {},
     'devices': set(),
 }
+
+# Enkel throttling av tilbakemeldinger per IP (anonymt endepunkt → spam-vern).
+# Maks FEEDBACK_MAX_PER_WINDOW innmeldinger per FEEDBACK_WINDOW_SEC sekunder.
+_feedback_lock = threading.Lock()
+_feedback_hits = {}  # ip -> liste av unix-tidsstempler
+FEEDBACK_MAX_PER_WINDOW = 5
+FEEDBACK_WINDOW_SEC = 600
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -124,6 +134,14 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path == '/api/ao-search-observers':
             self._handle_ao_search_observers_post()
+            return
+
+        if parsed.path == '/api/feedback':
+            self._handle_feedback_post()
+            return
+
+        if parsed.path == '/api/feedback-status':
+            self._handle_feedback_status_post(parsed)
             return
 
         # For alt annet, returner 404
@@ -258,6 +276,98 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(b'{"ok":true}')
         else:
             self._send_json({'ok': True})
+
+    def _feedback_rate_ok(self, ip):
+        """True hvis IP-en ikke har oversteget throttlegrensen for tilbakemeldinger."""
+        import time
+        now = time.time()
+        with _feedback_lock:
+            hits = [t for t in _feedback_hits.get(ip, []) if now - t < FEEDBACK_WINDOW_SEC]
+            if len(hits) >= FEEDBACK_MAX_PER_WINDOW:
+                _feedback_hits[ip] = hits
+                return False
+            hits.append(now)
+            _feedback_hits[ip] = hits
+            return True
+
+    def _handle_feedback_post(self):
+        """Ta imot en brukertilbakemelding (feil/ønske) fra anonym bruker."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+            data = json.loads(body)
+
+            # Honeypot: skjult felt som bare bots fyller ut. Later som alt gikk bra,
+            # men lagrer ingenting.
+            if (data.get('website') or '').strip():
+                self._send_json({'ok': True, 'caseNo': feedback_store._generate_case_no()})
+                return
+
+            xff = self.headers.get('X-Forwarded-For')
+            real_ip = xff.split(',')[0].strip() if xff else self.client_address[0]
+
+            if not self._feedback_rate_ok(real_ip):
+                self._send_json({'error': 'For mange innsendinger — prøv igjen senere.'}, status=429)
+                return
+
+            message = data.get('message', '')
+            if not (message or '').strip():
+                self._send_json({'error': 'Melding er påkrevd'}, status=400)
+                return
+
+            case_no = feedback_store.create_feedback(
+                message=message,
+                fb_type=data.get('type', 'annet'),
+                email=data.get('email', ''),
+                app_version=data.get('appVersion', ''),
+                user_agent=self.headers.get('User-Agent', ''),
+                ip=real_ip,
+            )
+            if not case_no:
+                self._send_json({'error': 'Kunne ikke lagre tilbakemeldingen'}, status=500)
+                return
+
+            logger.info(f'[FEEDBACK] Ny sak {case_no} (type={data.get("type", "annet")})')
+
+            # Send eier-varsel i bakgrunnen (best effort, no-op hvis ukonfigurert)
+            # slik at brukerens svar ikke forsinkes av epost-utsending.
+            ua_info = parse_user_agent(self.headers.get('User-Agent', ''))
+            device = ' / '.join(v for v in (
+                ua_info['device_type'], ua_info['os'], ua_info['browser']) if v and v != 'unknown')
+            threading.Thread(
+                target=email_notify.send_feedback_notification,
+                kwargs={
+                    'case_no': case_no,
+                    'fb_type': data.get('type', 'annet'),
+                    'message': (message or '').strip(),
+                    'email': (data.get('email') or '').strip(),
+                    'app_version': (data.get('appVersion') or '').strip(),
+                    'device': device,
+                },
+                daemon=True,
+            ).start()
+
+            self._send_json({'ok': True, 'caseNo': case_no})
+        except (json.JSONDecodeError, ValueError) as e:
+            self._send_json({'error': f'Ugyldig forespørsel: {e}'}, status=400)
+        except Exception as e:
+            logger.error(f'[FEEDBACK] Feil: {e}')
+            self._send_json({'error': 'Server-feil'}, status=500)
+
+    def _handle_feedback_status_post(self, parsed):
+        """Oppdater status på en sak (key-beskyttet admin-handling)."""
+        expected_key = os.environ.get('STATS_KEY', 'salo')
+        qs = parse_qs(parsed.query)
+        if qs.get('key', [''])[0] != expected_key:
+            self._send_json({'error': 'Ugyldig nøkkel'}, status=403)
+            return
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(content_length).decode('utf-8')) if content_length else {}
+            ok = feedback_store.set_status(data.get('caseNo', ''), data.get('status', ''))
+            self._send_json({'ok': ok}, status=200 if ok else 400)
+        except Exception as e:
+            self._send_json({'error': f'Ugyldig forespørsel: {e}'}, status=400)
 
     def _handle_ao_import_post(self):
         """Håndter direkte posting av observasjoner til AO (kun for eier)."""
@@ -523,6 +633,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             if parsed.path == '/stats':
                 self._handle_stats_page(parsed)
+                return
+            if parsed.path == '/feedback':
+                self._handle_feedback_page(parsed)
+                return
             elif parsed.path == '/api/species':
                 self._handle_species_api(parsed)
             elif parsed.path == '/api/reverse':
@@ -590,7 +704,22 @@ class Handler(SimpleHTTPRequestHandler):
                 total_unique_devices=unique_devices,
             )
         self._send_html_response(html)
-    
+
+    def _handle_feedback_page(self, parsed):
+        """Key-beskyttet admin-visning av innmeldte tilbakemeldinger."""
+        expected_key = os.environ.get('STATS_KEY', 'salo')
+        qs = parse_qs(parsed.query)
+        provided_key = qs.get('key', [''])[0]
+        if provided_key != expected_key:
+            self._send_html_response(generate_stats_login_page())
+            return
+
+        status_filter = qs.get('status', [''])[0]
+        items = feedback_store.list_feedback(status=status_filter)
+        counts = feedback_store.count_by_status()
+        html = generate_feedback_admin_page(items, counts, provided_key, status_filter)
+        self._send_html_response(html)
+
     def _handle_species_api(self, parsed):
         """Håndter arts-søk API."""
         params = parse_qs(parsed.query)

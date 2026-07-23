@@ -4,6 +4,8 @@ HTML templates for fugleobservasjoner.
 Genererer HTML-sider for statistikk og login.
 """
 
+import html as _html
+
 
 def generate_stats_login_page():
     """Generer login-side for statistikk."""
@@ -281,6 +283,121 @@ def generate_error_page(error_msg):
 <body>
     <h2>Feil ved henting av statistikk fra Supabase:</h2>
     <pre>{error_msg}</pre>
+</body>
+</html>
+"""
+
+
+_FEEDBACK_TYPE_LABEL = {'feil': '🐛 Feil', 'ønske': '💡 Ønske', 'annet': '💬 Annet'}
+_FEEDBACK_STATUS_LABEL = {
+    'ny': 'Ny', 'under_arbeid': 'Under arbeid', 'løst': 'Løst', 'avvist': 'Avvist',
+}
+_FEEDBACK_STATUS_COLOR = {
+    'ny': '#2563eb', 'under_arbeid': '#d97706', 'løst': '#16a34a', 'avvist': '#6b7280',
+}
+
+
+def generate_feedback_admin_page(items, counts, key, status_filter=''):
+    """Generer key-beskyttet admin-visning av innmeldte tilbakemeldinger."""
+    counts = counts or {}
+    total = sum(counts.values())
+
+    # Filter-lenker med antall per status
+    def _filter_link(value, label):
+        n = total if not value else counts.get(value, 0)
+        active = (status_filter == value)
+        style = 'font-weight:700;text-decoration:underline;' if active else ''
+        q = f'?key={_html.escape(key)}'
+        if value:
+            q += f'&status={value}'
+        return f'<a href="{q}" style="margin-right:14px;color:#2563eb;{style}">{label} ({n})</a>'
+
+    filters = _filter_link('', 'Alle') + ''.join(
+        _filter_link(s, _FEEDBACK_STATUS_LABEL[s]) for s in ('ny', 'under_arbeid', 'løst', 'avvist')
+    )
+
+    rows = []
+    for it in items:
+        case_no = _html.escape(str(it.get('case_no') or ''))
+        fb_type = it.get('type') or 'annet'
+        type_label = _FEEDBACK_TYPE_LABEL.get(fb_type, _html.escape(fb_type))
+        message = _html.escape(str(it.get('message') or '')).replace('\n', '<br>')
+        email = _html.escape(str(it.get('email') or ''))
+        email_cell = f'<a href="mailto:{email}?subject=Sak%20{case_no}">{email}</a>' if email else '<span style="color:#999">—</span>'
+        ts = _html.escape(str(it.get('ts') or ''))
+        version = _html.escape(str(it.get('app_version') or ''))
+        device = _html.escape(' / '.join(x for x in (
+            it.get('device_type'), it.get('os'), it.get('browser')) if x and x != 'unknown'))
+        status = it.get('status') or 'ny'
+        color = _FEEDBACK_STATUS_COLOR.get(status, '#333')
+
+        options = ''.join(
+            f'<option value="{s}"{" selected" if s == status else ""}>{_FEEDBACK_STATUS_LABEL[s]}</option>'
+            for s in ('ny', 'under_arbeid', 'løst', 'avvist')
+        )
+        status_select = (
+            f'<select onchange="setStatus(\'{case_no}\', this.value)" '
+            f'style="padding:4px;border-radius:6px;border:1px solid #ccc;color:{color};font-weight:600;">{options}</select>'
+        )
+
+        rows.append(f"""
+        <tr>
+            <td style="white-space:nowrap;"><strong>{case_no}</strong><br>
+                <span style="color:#888;font-size:0.8em;">{ts}</span></td>
+            <td style="white-space:nowrap;">{type_label}</td>
+            <td>{message}</td>
+            <td style="white-space:nowrap;font-size:0.85em;">{email_cell}</td>
+            <td style="white-space:nowrap;font-size:0.8em;color:#666;">{version}<br>{device}</td>
+            <td style="white-space:nowrap;">{status_select}</td>
+        </tr>""")
+
+    if not rows:
+        rows_html = '<tr><td colspan="6" style="text-align:center;color:#888;padding:2em;">Ingen tilbakemeldinger ennå.</td></tr>'
+    else:
+        rows_html = ''.join(rows)
+
+    return f"""<!DOCTYPE html>
+<html lang="nb">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Tilbakemeldinger</title>
+    <style>
+        body {{ font-family: system-ui, sans-serif; background: #f8f9fa; color: #222; margin: 0; padding: 0; }}
+        .container {{ max-width: 1100px; margin: 1.5em auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px #0001; padding: 1.5em 2em; }}
+        h1 {{ margin: 0 0 0.3em 0; }}
+        .filters {{ margin: 0.5em 0 1.2em 0; font-size: 0.95em; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: top; }}
+        th {{ background: #f0f0f0; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; color: #555; }}
+        td {{ font-size: 0.95em; }}
+        a {{ text-decoration: none; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💬 Tilbakemeldinger</h1>
+        <div class="filters">{filters}</div>
+        <table>
+            <thead>
+                <tr><th>Sak / tid</th><th>Type</th><th>Melding</th><th>Epost</th><th>Versjon / enhet</th><th>Status</th></tr>
+            </thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+    </div>
+    <script>
+        const KEY = {_html.escape(repr(key))};
+        async function setStatus(caseNo, status) {{
+            try {{
+                const r = await fetch('/api/feedback-status?key=' + encodeURIComponent(KEY), {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ caseNo, status }})
+                }});
+                if (!r.ok) alert('Kunne ikke oppdatere status');
+            }} catch (e) {{ alert('Feil: ' + e.message); }}
+        }}
+    </script>
 </body>
 </html>
 """

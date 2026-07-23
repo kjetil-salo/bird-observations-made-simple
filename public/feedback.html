@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#020617" />
+  <title>Gi tilbakemelding – Fugleobservasjoner</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      color: var(--text, #e5e7eb);
+      padding: 20px 12px;
+    }
+    .fb-card {
+      max-width: 560px;
+      margin: 0 auto;
+      background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(15,23,42,0.92));
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.12);
+      box-shadow: 0 12px 28px rgba(15,23,42,0.72);
+      padding: 24px 28px;
+      backdrop-filter: blur(14px);
+    }
+    .fb-lead { color: var(--muted, #9ca3af); margin: 0 0 8px; font-size: 0.95em; }
+    .fb-label { display: block; margin: 16px 0 6px; font-size: 0.95em; color: var(--text, #e5e7eb); }
+    .fb-optional { color: var(--muted, #9ca3af); font-weight: 400; }
+    .fb-input, .fb-textarea, .fb-select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,0.3);
+      background: rgba(15,23,42,0.8);
+      color: var(--text, #e5e7eb);
+      font-size: 16px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    .fb-textarea { min-height: 120px; resize: vertical; }
+    .fb-hint { color: var(--muted, #9ca3af); font-size: 0.82em; margin-top: 4px; }
+    .fb-submit {
+      margin-top: 20px; width: 100%; padding: 12px;
+      border-radius: 8px; border: none; background: #3b82f6; color: #fff;
+      font-size: 1.05em; cursor: pointer; font-weight: 600;
+    }
+    .fb-submit:disabled { opacity: 0.6; cursor: default; }
+    /* Honeypot: skjult for mennesker, bots fyller det ut */
+    .fb-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    #fb-result { display: none; text-align: center; }
+    #fb-case {
+      font-size: 1.6em; font-weight: 700; letter-spacing: 0.04em;
+      color: #34d399; margin: 12px 0; user-select: all;
+    }
+    #fb-error { display: none; margin-top: 12px; color: #f87171; font-size: 0.9em; text-align: center; }
+    .fb-back { display: block; margin-top: 28px; text-align: center; color: #3b82f6; text-decoration: none; font-size: 1.05em; }
+
+    /* Lyst tema (default for nye brukere) + clean (som arver lys-familien) */
+    body.theme-light {
+      background: #f8fafc !important;
+      color: #1a1a1a !important;
+    }
+    body.theme-light .fb-card {
+      background: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+      backdrop-filter: none !important;
+    }
+    body.theme-light .fb-lead,
+    body.theme-light .fb-hint,
+    body.theme-light .fb-optional { color: #64748b !important; }
+    body.theme-light .fb-label { color: #334155 !important; }
+    body.theme-light .fb-input,
+    body.theme-light .fb-textarea,
+    body.theme-light .fb-select {
+      background: #ffffff !important;
+      color: #1a1a1a !important;
+      border-color: #cbd5e1 !important;
+    }
+    body.theme-light #fb-case { color: #059669 !important; }
+    /* Clean-modifikator: monokrom aksent */
+    body.theme-clean .fb-submit { background: #111827 !important; }
+    body.theme-clean .fb-back,
+    body.theme-clean .fb-submit { color: #fff !important; }
+  </style>
+</head>
+<body>
+  <script src="/js/theme.js"></script>
+
+  <div class="fb-card">
+    <h2 style="margin:0 0 4px;">💬 Gi tilbakemelding</h2>
+    <p class="fb-lead">
+      Meld fra om en feil eller foreslå en forbedring. Du får et saksnummer som kvittering.
+    </p>
+
+    <form id="fb-form">
+      <label class="fb-label" for="fb-type">Hva gjelder det?</label>
+      <select id="fb-type" class="fb-select">
+        <option value="feil">🐛 Feil / noe virker ikke</option>
+        <option value="ønske">💡 Ønske / forslag</option>
+        <option value="annet">💬 Annet</option>
+      </select>
+
+      <label class="fb-label" for="fb-message">Melding</label>
+      <textarea id="fb-message" class="fb-textarea" maxlength="4000"
+        placeholder="Beskriv feilen eller ønsket så godt du kan …"></textarea>
+
+      <label class="fb-label" for="fb-email">Din e-post <span class="fb-optional">(valgfritt)</span></label>
+      <input id="fb-email" class="fb-input" type="email" autocomplete="email"
+        placeholder="navn@eksempel.no" maxlength="200" />
+      <div class="fb-hint">Fyll inn hvis du vil at vi kan svare deg. Vi deler den aldri.</div>
+
+      <!-- Honeypot mot bots — la stå tomt -->
+      <div class="fb-hp" aria-hidden="true">
+        <label>La dette feltet stå tomt<input type="text" id="fb-website" tabindex="-1" autocomplete="off" /></label>
+      </div>
+
+      <button type="submit" id="fb-submit" class="fb-submit">Send inn</button>
+      <div id="fb-error"></div>
+    </form>
+
+    <div id="fb-result">
+      <p style="font-size:2.2em;margin:8px 0;">✅</p>
+      <p style="margin:0;">Takk! Tilbakemeldingen er registrert.</p>
+      <p class="fb-hint" style="margin:16px 0 4px;">Ditt saksnummer:</p>
+      <div id="fb-case"></div>
+      <p class="fb-hint">Ta vare på dette hvis du vil følge opp saken senere.</p>
+    </div>
+
+    <a href="/" class="fb-back">← Tilbake til appen</a>
+  </div>
+
+  <script type="module">
+    import { VERSION } from './js/version.js';
+
+    const form = document.getElementById('fb-form');
+    const submitBtn = document.getElementById('fb-submit');
+    const errorEl = document.getElementById('fb-error');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.style.display = 'none';
+
+      const message = document.getElementById('fb-message').value.trim();
+      if (!message) {
+        errorEl.textContent = 'Skriv en melding før du sender.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sender …';
+
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: document.getElementById('fb-type').value,
+            message,
+            email: document.getElementById('fb-email').value.trim(),
+            website: document.getElementById('fb-website').value, // honeypot
+            appVersion: VERSION,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || 'Noe gikk galt. Prøv igjen senere.');
+        }
+        document.getElementById('fb-case').textContent = data.caseNo || '';
+        form.style.display = 'none';
+        document.getElementById('fb-result').style.display = 'block';
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send inn';
+      }
+    });
+  </script>
+</body>
+</html>
