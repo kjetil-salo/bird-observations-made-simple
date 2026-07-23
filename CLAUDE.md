@@ -81,13 +81,26 @@ The `Handler` class routes requests:
     - `POST /ReviewSighting/NumberOfSightingsSubmitted` (body `null`) → `{"Count":N}` i review-kø
   - Erstatter tidligere blind `sleep(3)` i `src/ao_import_httpx.py` med reell polling
 - `/api/logview` (POST) → logs page views to Supabase
+- `/api/feedback` (POST) → tar imot brukertilbakemelding (feil/ønske/annet) uten innlogging
+  - Lagrer i `src/feedback_store.py` (SQLite), genererer saksnummer `AO-XXXXX`
+  - Spam-vern: honeypot-felt (`website`), per-IP throttling (5/10 min), lengdegrenser
+  - Sender eier-varsel via `src/email_notify.py` i bakgrunnstråd (best effort, `Reply-To` = melder)
+- `/api/feedback-status` (POST, key-protected) → oppdaterer status på en sak (ny/under_arbeid/løst/avvist)
+- `/feedback?key=X` → key-beskyttet admin-visning av tilbakemeldinger (statusfilter + statusendring)
 - `/stats?key=X` → displays analytics (key-protected)
 - `/health` → health check endpoint
 
 ### Backend Modules (src/)
 - `api_handlers.py` — External API calls (species search, geocoding, AO sites, autocomplete)
-- `html_templates.py` — HTML generation for stats pages
+- `html_templates.py` — HTML generation for stats- og feedback-admin-sider
 - `supabase_log.py` — Optional Supabase analytics logging
+- `feedback_store.py` — SQLite-lagring av tilbakemeldinger (samme `stats.db` via `DB_PATH`)
+  - Schema: `case_no, type, message, email, app_version, user_agent, device_type, os, browser, ip, status, ts`
+  - Saksnummer `AO-XXXXX` fra entydig alfabet (uten 0/O/1/I/L); `create_feedback`, `list_feedback`, `set_status`, `count_by_status`
+- `email_notify.py` — Eier-varsel ved ny tilbakemelding. Provider auto-detekteres, ren no-op hvis ukonfigurert
+  - Prioritet: SMTP (`SMTP_HOST`+`SMTP_USER`+`SMTP_PASS` via smtplib/STARTTLS) → Resend → SMTP2GO HTTP
+  - `Reply-To` settes til melderens epost → «Svar» går rett til brukeren. 1 retry ved forbigående feil
+  - **Prod bruker SMTP2GO** (gjenbruker drivstoff-appens creds): `mail-eu.smtp2go.com:2525`, From `noreply@drivstoffprisene.no`
 - `location_db.py` — SQLite-cache for AO-lokasjoner (delt mellom containere via Docker-volum)
   - Aktiveres med `LOCATION_DB_PATH` env-var
   - Schema: `ao_id, name, lat, lon, is_private, is_super, parent_id, municipality, county, source`
@@ -151,7 +164,13 @@ except Exception as e:
   - Aktiverer lokalt navnesøk og avstandssortering i autocomplete uten innlogging
   - Fylles med `tools/import_ao_locations.py` (~487k norske lokasjoner, 78 MB)
 - `SUPABASE_URL`, `SUPABASE_KEY` (optional logging)
-- `STATS_KEY` (stats page auth, default: 'salo')
+- `STATS_KEY` (stats- og feedback-admin auth, default: 'salo')
+- **Tilbakemelding-epostvarsel** (alle valgfrie — uten dem er varsling en no-op, skjema virker uansett):
+  - `FEEDBACK_NOTIFY_TO` — mottaker (eier). Uten denne sendes ingenting
+  - `FEEDBACK_NOTIFY_FROM` — avsender (må være verifisert hos provideren)
+  - `SMTP_HOST`, `SMTP_PORT` (default 2525), `SMTP_USER`, `SMTP_PASS` — SMTP-utsending (prioriteres)
+  - alternativt `RESEND_API_KEY` eller `SMTP2GO_API_KEY` for HTTP-API-utsending
+  - Prod (Pi) og staging (Fly) bruker SMTP2GO SMTP; ligger som secrets/`.env` utenfor repo
 
 For å teste med mock (simulere AO-timeout):
 ```bash
