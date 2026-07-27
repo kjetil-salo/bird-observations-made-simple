@@ -1,7 +1,9 @@
 # Rette observasjoner etter sending til AO — vurdering og plan
 
 **Dato:** 2026-07-27
-**Status:** Fase A ikke bygget. **Fase B implementert i v1.41.0** (27.07.2026). Fase C utsatt.
+**Status:** Fase 0 ferdig (se `ao-rediger-api.md`). **Fase B implementert i v1.41.0**
+(27.07.2026). **Fase C besluttet utsatt til etter BirdLife-lanseringen** (27.07.2026) —
+fase A er neste.
 **Bakgrunn:** Brukeren sender observasjoner til Artsobservasjoner (direktesending), oppdager
 etterpå at noe er feil (art, antall, aktivitet, lokalitet, tid) — og appen har ingen vei tilbake.
 
@@ -183,9 +185,28 @@ Akseptansekriterier:
 Estimat: ~1 dag. Avgrenset: **kun direktesending logges** i v1 (CSV-eksport og
 kopier-og-åpne vet vi ikke utfallet av).
 
-### Fase C — Redigering i appen (betinget, utsatt)
+### Fase C — Redigering i appen (utsatt til etter lansering, besluttet 27.07.2026)
 
-Bygges kun hvis fase 0 gir grønt lys. Skisse, ikke bestilling:
+**Beslutning:** fase 0 ga teknisk grønt lys — det *er* mulig — men prisen ble bekreftet
+høyere enn antatt (149 felt i `Save`, ingen GET-URL, funnet må publiseres på nytt).
+Utsatt fordi:
+
+1. Fase C er det eneste i backloggen der en bug ødelegger data hos andre. Alt annet
+   skriver til localStorage eller egen SQLite; dette skriver inn i den nasjonale
+   artsdatabasen, og derfra videre til GBIF. Feil rekkefølge rett før en lansering rettet
+   mot nybegynnere, der stabilitet er hovedkravet.
+2. AO løser allerede redigering. Den faktiske smerten — at appen glemte hva som ble sendt
+   — er borte med fase B.
+3. Tilbakemeldingskanalen (v1.39.0) har ikke mottatt ett eneste ønske om redigering.
+
+**Revisjonspunkt:** tas opp igjen når brukere ber om det, eller etter lansering.
+
+**Første milepæl når den bygges: en no-op round-trip.** Hent skjemaet for én obs, parse
+alle 149 felt, post dem tilbake *uendret*, og verifiser at observasjonen er identisk
+etterpå. Klarer vi ikke det, klarer vi ikke å redigere trygt heller — og da vet vi det
+uten å ha ødelagt noe.
+
+Resten av skissen, ikke bestilling:
 
 - **Én observasjon om gangen. Aldri batch.**
 - **Full round-trip:** GET redigeringsskjemaet for obsen → parse alle felt → endre kun det
