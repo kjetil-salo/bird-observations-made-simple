@@ -223,17 +223,6 @@
         Når denne er på, brukes kun den lokale artslisten (ingen søk mot Artsobservasjoner).
       </div>
 
-      <div class="settings-row">
-        <span class="settings-label">Etterregistreringsmodus</span>
-        <label class="switch">
-          <input type="checkbox" id="after-registration-mode" />
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div style="font-size:0.92em;color:var(--muted,#aaa);">
-        Aktiver for å registrere observasjoner med egen dato/tid (ikke sanntid).
-      </div>
-
       <div style="margin-top:24px;padding-top:18px;border-top:1px solid rgba(148,163,184,0.12);">
         <h3 style="margin:0 0 4px 0;font-size:1em;color:var(--text,#e5e7eb);">Sikkerhetskopi</h3>
         <p style="font-size:0.82em;color:var(--muted,#aaa);margin:0 0 14px 0;">
@@ -462,15 +451,6 @@
       cb.addEventListener('change', () => {
         if(cb.checked) localStorage.setItem(key, '1');
         else localStorage.removeItem(key);
-      });
-
-      // Etterregistreringsmodus
-      const modeKey = 'afterRegistrationMode';
-      const modeCheckbox = document.getElementById('after-registration-mode');
-      modeCheckbox.checked = localStorage.getItem(modeKey) === '1';
-      modeCheckbox.addEventListener('change', () => {
-        if(modeCheckbox.checked) localStorage.setItem(modeKey, '1');
-        else localStorage.removeItem(modeKey);
       });
 
       // Vis private lokasjoner på kart
