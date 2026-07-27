@@ -30,7 +30,14 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      // cache: 'reload' hopper over nettleserens HTTP-cache. Uten den kan en ny SW
+      // precache akkurat de utdaterte filene den skulle erstatte — Cloudflare sender
+      // max-age=14400 på JS, så nettleseren ville ellers svart fra egen cache.
+      return Promise.all(STATIC_ASSETS.map((url) =>
+        fetch(url, { cache: 'reload' })
+          .then((res) => (res.ok ? cache.put(url, res) : null))
+          .catch(() => null)
+      ));
     })
   );
   self.skipWaiting();
