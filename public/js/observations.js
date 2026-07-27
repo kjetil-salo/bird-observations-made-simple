@@ -344,6 +344,16 @@ export function renderObservations(observations, obsListEl, buttons, saveState) 
         badge.title = `Skjult for offentligheten til ${full}. Ingen andre kan se funnet. Endre via blyant-ikonet.`;
         primaryLine.appendChild(badge);
       }
+      // Allerede publisert til AO. Lista tømmes ikke automatisk etter sending, så
+      // uten dette merket er det umulig å se hvilke som ville blitt sendt på nytt.
+      if (obs.sentTs) {
+        const sendtMerke = document.createElement('span');
+        sendtMerke.className = 'obs-sent-badge';
+        sendtMerke.textContent = '✓';
+        sendtMerke.title = 'Allerede sendt til Artsobservasjoner';
+        sendtMerke.setAttribute('aria-label', 'Allerede sendt til Artsobservasjoner');
+        primaryLine.appendChild(sendtMerke);
+      }
       primaryTd.appendChild(primaryLine);
 
       // Underlinje: kun alder/kjønn, og kun når noe faktisk er satt.

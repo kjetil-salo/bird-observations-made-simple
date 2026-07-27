@@ -107,6 +107,57 @@ function _findFutureObservation(observations) {
   });
 }
 
+// Lista tømmes ikke automatisk etter sending. Svarer brukeren nei på «tøm lista?» og
+// registrerer nye funn senere, ville et nytt trykk sendt de gamle på nytt — og de blir
+// liggende dobbelt i AO uten at noe sa fra. Dialogen er stille når alt er nytt.
+function _visDublettAdvarsel(antallSendt, antallTotalt, sendtTs) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '1000', background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+    });
+
+    const box = document.createElement('div');
+    Object.assign(box.style, {
+      background: 'var(--card-bg, #1e293b)', borderRadius: '12px', padding: '20px',
+      maxWidth: '380px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+    });
+
+    const nye = antallTotalt - antallSendt;
+    const naar = sendtTs ? new Date(sendtTs) : null;
+    const naarTekst = naar && !isNaN(naar)
+      ? ` ${naar.toDateString() === new Date().toDateString() ? 'i dag' : 'tidligere'} kl. ${String(naar.getHours()).padStart(2, '0')}:${String(naar.getMinutes()).padStart(2, '0')}`
+      : '';
+
+    const knapp = 'padding:9px 14px;border-radius:8px;font-size:0.9em;cursor:pointer;width:100%;margin-top:8px;';
+    box.innerHTML = `
+      <h3 style="margin:0 0 10px 0;font-size:1.05em;">⚠️ Noen er allerede sendt</h3>
+      <p style="margin:0 0 16px 0;font-size:0.9em;line-height:1.45;">
+        ${antallSendt} av disse ${antallTotalt} ble sendt til AO${naarTekst}.
+        Sender du alt nå, blir de liggende dobbelt.
+      </p>
+      <button id="dub-nye" style="${knapp}border:none;background:var(--accent,#3b82f6);color:#fff;font-weight:500;">
+        Send bare ${nye === 1 ? 'den nye' : `de ${nye} nye`}
+      </button>
+      <button id="dub-alt" style="${knapp}border:1px solid var(--border,rgba(148,163,184,0.25));background:transparent;color:var(--text);">
+        Send alt likevel
+      </button>
+      <button id="dub-avbryt" style="${knapp}border:none;background:transparent;color:var(--muted);">
+        Avbryt
+      </button>`;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const svar = (verdi) => { overlay.remove(); resolve(verdi); };
+    box.querySelector('#dub-nye').addEventListener('click', () => svar('kun-nye'));
+    box.querySelector('#dub-alt').addEventListener('click', () => svar('alt'));
+    box.querySelector('#dub-avbryt').addEventListener('click', () => svar('avbryt'));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) svar('avbryt'); });
+  });
+}
+
 export async function handleDirectSend(observations, dom, callbacks) {
   if (!observations.length) return;
 
@@ -122,7 +173,20 @@ export async function handleDirectSend(observations, dom, callbacks) {
     return;
   }
 
-  const total = observations.length;
+  // Allerede publiserte funn i lista → la brukeren velge før noe sendes
+  let utvalg = observations;
+  const alleredeSendt = observations.filter((o) => o.sentTs);
+  if (alleredeSendt.length) {
+    const valg = await _visDublettAdvarsel(alleredeSendt.length, observations.length,
+                                           alleredeSendt[0].sentTs);
+    if (valg === 'avbryt') return;
+    if (valg === 'kun-nye') {
+      utvalg = observations.filter((o) => !o.sentTs);
+      if (!utvalg.length) return;
+    }
+  }
+
+  const total = utvalg.length;
 
   dom.aoDirectBtn.disabled = true;
   _renderProgress(dom, 1, 3, 'Logger inn på AO…');
@@ -150,7 +214,7 @@ export async function handleDirectSend(observations, dom, callbacks) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        observations,
+        observations: utvalg,
         loginToken: tokens.loginToken,
         authCookie: tokens.authCookie,
         areaId: localStorage.getItem('ao_area') ? JSON.parse(localStorage.getItem('ao_area')).id : '',
@@ -223,9 +287,14 @@ export async function handleDirectSend(observations, dom, callbacks) {
     dom.aoDirectStatus.textContent = `✅ ${importResult.count} observasjon${importResult.count !== 1 ? 'er' : ''} sendt til AO!`;
     fetch('/api/log-export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'direct' }) }).catch(() => {});
 
-    // Husk hva som ble sendt FØR lista eventuelt tømmes — ellers er kvitteringen
-    // borte i samme øyeblikk brukeren svarer «ja» på spørsmålet under.
-    appendSentBatch(observations);
+    // Merk hva som ble publisert, så et nytt trykk ikke sender dem på nytt, og lista
+    // kan vise «✓ sendt». Må skje FØR lista eventuelt tømmes — ellers er både
+    // kvitteringen og merkingen borte i samme øyeblikk brukeren svarer «ja» under.
+    const sendtTidspunkt = new Date().toISOString();
+    utvalg.forEach((o) => { o.sentTs = sendtTidspunkt; });
+    appendSentBatch(utvalg);
+    callbacks.doRenderObservations();
+    callbacks.saveState();
 
     setTimeout(() => {
       if (confirm('Sending vellykket! Vil du tømme observasjonslisten?')) {

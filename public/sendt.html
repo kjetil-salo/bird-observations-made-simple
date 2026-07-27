@@ -146,11 +146,14 @@
             if (!confirm(`Legge ${obs.length} observasjon${obs.length !== 1 ? 'er' : ''} tilbake i arbeidslista? `
               + 'De er allerede sendt til AO — send dem bare på nytt hvis du har slettet dem der.')) return;
 
-            // Nytt besøk: fjern visit-koblingen så de ikke smelter sammen med gamle grupper
+            // Nytt besøk: fjern visit-koblingen så de ikke smelter sammen med gamle grupper.
+            // sentTs må også bort — kopien er ment å sendes, og skal ikke utløse
+            // dublett-advarselen eller vises som «✓ sendt».
             const kopier = obs.map(o => {
               const kopi = JSON.parse(JSON.stringify(o));
               delete kopi.visitId;
               delete kopi.visitLocked;
+              delete kopi.sentTs;
               return kopi;
             });
             saveObservations([...kopier, ...loadObservations()]);

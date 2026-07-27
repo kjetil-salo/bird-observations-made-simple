@@ -111,7 +111,23 @@ Spørsmål som skal besvares:
 
 Dokumenteres i `docs/ao-rediger-api.md` (samme mønster som `ao-lokalitet-api.md`).
 
-### Fase A — Bekreftelse før sending
+### Fase A — Bekreftelse før sending ❌ (droppet 27.07.2026)
+
+**Beslutning: ikke bygget.** Begrunnelsen for fase A var å fange «altfor ivrig»-feilen, men
+den feilen var ikke et bomtrykk — brukeren sendte bevisst, med feil data. Den konkrete
+feilen vi observerte (tårnseiler med tidspunkt frem i tid) fanges nå av automatisk
+validering i tre ledd pluss en siste kontroll før sending, og det er strengt bedre enn å be
+et menneske se etter selv. «Er du sikker?»-dialoger blir dessuten klikket bort uten lesing
+etter tredje gang, og publiser-knappen ligger i seksjon ④, langt fra registreringsflyten.
+
+Det eneste den ville fanget som automatikken ikke gjør, er **feil lokalitet** — ingen regel
+kan vite at brukeren egentlig var et annet sted. Men lokaliteten står allerede i lista.
+
+**Hvis det viser seg å bli et problem:** vis opplysningen uten å blokkere — en linje ved
+knappen («7 obs · Lønningen · 26. juli») som leses i forbifarten. Informasjonen, ikke
+dialogen.
+
+Opprinnelig skisse, beholdt for ettertiden:
 
 Minimal endring i `handleDirectSend`: en oppsummering før noe sendes.
 

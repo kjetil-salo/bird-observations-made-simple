@@ -129,6 +129,8 @@ Pure ES6 modules with no framework:
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
   - **Sendt-logg** (`sent_observations_v1`): `appendSentBatch()` / `loadSentBatches()`
+  - Publiserte obser stemples med `sentTs` i arbeidslista → «✓ sendt»-merke og dublett-vern
+    før neste sending. `sentTs` strippes ved «Kopier til lista» fra `sendt.html`
   - Kvittering for det som er publisert, 7 dager / maks 200 obs (`SENT_MAX_DAYS`, `SENT_MAX_OBS`)
   - Skrives i `handleDirectSend` **før** «tøm lista»-spørsmålet — ellers er kvitteringen borte
   - Opprydding skjer ved lesing og skriving; ingen cron

@@ -169,6 +169,26 @@ body.theme-light .obs-hide-badge {
   background: rgba(180, 83, 9, 0.12);
 }
 
+/* Allerede publisert til AO — dempet, det er en opplysning og ikke en advarsel */
+.obs-sent-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  font-size: 0.72em;
+  font-weight: var(--font-weight-medium);
+  color: #86efac;
+  background: rgba(134, 239, 172, 0.14);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+body.theme-light .obs-sent-badge {
+  color: #15803d;
+  background: rgba(21, 128, 61, 0.12);
+}
+
 /* ============================================================================
    INPUTS
    ========================================================================= */
