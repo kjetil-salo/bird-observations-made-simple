@@ -121,6 +121,12 @@ class TestSearchNearby:
         results = db.search_nearby(59.9075, 10.7530, radius_m=100)
         assert results[0]['_source'] == 'local_db'
 
+    def test_includes_municipality(self, db):
+        db.upsert_locations([{**SITE_OPERAEN, 'municipality': 'Oslo', 'county': 'Oslo'}])
+        results = db.search_nearby(59.9075, 10.7530, radius_m=100)
+        assert results[0]['municipality'] == 'Oslo'
+        assert results[0]['county'] == 'Oslo'
+
 
 class TestSearchByName:
     def test_finds_by_partial_name(self, db):

@@ -279,6 +279,36 @@ describe('setAoSiteSuggestions', () => {
     expect(dropdown.children[1].textContent).toContain('🏷️');
   });
 
+  it('should show kommune from AO-respons under lokalitetsnavnet', () => {
+    const sites = [
+      { name: 'Storevatnet', lat: 59.91, lon: 10.81, raw: { municipalityName: 'Bergen' } }
+    ];
+
+    setAoSiteSuggestions(sites, { lat: 59.9, lon: 10.7 }, dropdown, aoSitesEl, placeInput, setCurrentPlace);
+
+    expect(dropdown.children[1].textContent).toContain('Bergen');
+  });
+
+  it('should show kommune from lokal DB', () => {
+    const sites = [
+      { name: 'Storevatnet', lat: 59.91, lon: 10.81, municipality: 'Askøy' }
+    ];
+
+    setAoSiteSuggestions(sites, { lat: 59.9, lon: 10.7 }, dropdown, aoSitesEl, placeInput, setCurrentPlace);
+
+    expect(dropdown.children[1].textContent).toContain('Askøy');
+  });
+
+  it('should not break when kommune is missing', () => {
+    const sites = [
+      { name: 'Uten kommune', lat: 59.91, lon: 10.81 }
+    ];
+
+    setAoSiteSuggestions(sites, { lat: 59.9, lon: 10.7 }, dropdown, aoSitesEl, placeInput, setCurrentPlace);
+
+    expect(dropdown.children[1].textContent).toContain('Uten kommune');
+  });
+
   it('should prefix private sites with lock emoji', () => {
     const sites = [
       { name: 'Privat', lat: 59.91, lon: 10.81, isPrivate: true }
@@ -323,7 +353,7 @@ describe('setAoSiteSuggestions', () => {
 
     // Klikk på textSpan-elementet (første child av site-elementet)
     const siteElement = dropdown.children[1];
-    const textSpan = siteElement.querySelector('span');
+    const textSpan = siteElement.querySelector('.ao-site-text');
     textSpan.click();
 
     expect(setCurrentPlace).toHaveBeenCalledWith('Østensjøvannet', null);

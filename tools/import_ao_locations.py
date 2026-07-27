@@ -128,6 +128,10 @@ def normalize_sites(raw_sites):
             'isPrivate': False,
             'isSuper': is_super,
             'parentId': parent_id,
+            # AO oppgir kommune/fylke per lokalitet — mer presist enn Nominatim
+            # på celle-senteret, som bommer nær kommunegrenser
+            'municipality': item.get('municipalityName'),
+            'county': item.get('countyName'),
         })
     return result
 
@@ -164,18 +168,22 @@ def main():
             try:
                 raw = fetch_sites_in_bbox(lat, lon, max_lat, max_lon)
                 sites = normalize_sites(raw)
-                if sites:
+                municipality = county = None
+                # Nominatim brukes kun som fallback for sites uten kommune fra AO
+                if any(not s.get('municipality') for s in sites):
                     center_lat = (lat + max_lat) / 2
                     center_lon = (lon + max_lon) / 2
                     municipality, county = fetch_municipality(center_lat, center_lon)
                     for s in sites:
-                        s['municipality'] = municipality
-                        s['county'] = county
+                        if not s.get('municipality'):
+                            s['municipality'] = municipality
+                            s['county'] = county
                 upserted = db.upsert_locations(sites, source='bulk-import')
                 total_sites_fetched += len(sites)
                 total_upserted += upserted
                 if sites:
-                    loc_str = f'{municipality}, {county}' if municipality else '–'
+                    first = sites[0]
+                    loc_str = f'{first["municipality"]}, {first["county"]}' if first.get('municipality') else '–'
                     print(f'  [{cell:4d}/{total}] ({lat:.1f},{lon:.1f}): {len(sites):4d} lok — {loc_str}')
             except Exception as e:
                 errors += 1

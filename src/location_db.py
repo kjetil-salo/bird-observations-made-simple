@@ -126,7 +126,8 @@ class LocationDB:
 
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT ao_id, name, lat, lon, is_private, is_super, parent_id, source
+                """SELECT ao_id, name, lat, lon, is_private, is_super, parent_id,
+                          municipality, county, source
                    FROM locations
                    WHERE lat BETWEEN ? AND ?
                      AND lon BETWEEN ? AND ?""",
@@ -145,6 +146,8 @@ class LocationDB:
                     'isPrivate': bool(row['is_private']),
                     'isSuper': bool(row['is_super']),
                     'parentId': row['parent_id'],
+                    'municipality': row['municipality'],
+                    'county': row['county'],
                     '_source': 'local_db',
                     '_distance': dist,
                 })

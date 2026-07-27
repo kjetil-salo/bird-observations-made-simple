@@ -67,6 +67,8 @@ The `Handler` class routes requests:
 - `/api/ao-sites?lat=X&lon=Y&size=M` → fetches nearby observation locations from Artsobservasjoner
   - **Backend returnerer både private og offentlige** (maxSites=1000)
   - **Frontend (map.js)**: Kun offentlige vises på kart (sparer CPU/minne, brukeren vet hvor egne er)
+  - **Kommune/fylke**: `municipalityName`/`countyName` fra AO normaliseres til `municipality`/`county`
+    og vises som undertekst i dropdown (skiller lokaliteter med samme navn)
   - **Frontend (location.js)**: Både offentlige og private i dropdown, maks 20. Sortering: 🏷️ superlokasjoner → offentlige → 👤 egne private (isMine) → andres private
 - `/api/ao-autocomplete?term=X[&lat=Y&lon=Z]` → tekstsøk på lokaliteter
   - Søker lokal DB først (ingen innlogging nødvendig), deretter AO hvis innlogget

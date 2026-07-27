@@ -145,6 +145,23 @@ def test_normalize_site_parent_implies_not_super():
     assert site['parentId'] == 1
 
 
+def test_normalize_site_municipality():
+    """Test at kommune og fylke fra AO tas med."""
+    raw = {'id': 3, 'name': 'Storevatnet', 'lat': 60.0, 'lon': 10.0,
+           'municipalityName': 'Bergen', 'countyName': 'Vestland'}
+    site = _normalize_site(raw, set())
+    assert site['municipality'] == 'Bergen'
+    assert site['county'] == 'Vestland'
+
+
+def test_normalize_site_without_municipality():
+    """Test at manglende kommune ikke gir tomme felt."""
+    raw = {'id': 4, 'name': 'Uten kommune', 'lat': 60.0, 'lon': 10.0}
+    site = _normalize_site(raw, set())
+    assert 'municipality' not in site
+    assert 'county' not in site
+
+
 # --- _resolve_super_sites ---
 
 def test_resolve_super_sites():

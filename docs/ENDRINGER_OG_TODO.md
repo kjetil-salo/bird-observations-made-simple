@@ -166,6 +166,8 @@ Se **[sending-deling-2026-07.md](sending-deling-2026-07.md)** for full oversikt.
 - **Ytterligere Supabase-funksjoner**: Bruke Supabase til mer enn bare statistikk
 - **Server-lagring av brukerinnstillinger (multi-enhet)**: La brukeren synke innstillinger (aktivitets-pills, forkortelser, tema, medobservatører, radius m.m.) på tvers av enheter. Naturlig nøkkel: AO `userId` (allerede tilgjengelig ved innlogging), lagret i Supabase. Vurder synk-strategi (siste-skriver-vinner vs. flett), og hva som IKKE skal synkes (aldri passord). Henger sammen med innloggings-løftet — når bruker først er innlogget, kan innstillinger følge kontoen.
 
+- **Re-import av LocationDB med AOs egne kommunedata** (etter v1.43.0): `tools/import_ao_locations.py` henter nå kommune/fylke per lokalitet fra AO (`municipalityName`/`countyName`) i stedet for ett Nominatim-oppslag per bbox-celle. Eksisterende rader i `locations.db` har fortsatt celle-basert kommune, som bommer nær kommunegrenser og mangler helt for enkelte. En re-import (~40 min, `LOCATION_DB_PATH=/mnt/ssd/docker/volumes/shared-locations/_data/locations.db`) retter dette. Gjelder kun lokaliteter som vises fra lokal DB — treff fra AO har korrekt kommune allerede.
+
 - **Sendt-logg for «Kopier & åpne AO-import»**: Sendt-loggen (v1.41.0) fanger kun direktesending. Bruker man kopier-og-åpne, vet ikke appen om importen faktisk gikk bra, og logger derfor ingenting. Mulig løsning: logg som «antatt sendt» med tydelig merking, eller spør brukeren etterpå. Vurder om det er verdt kompleksiteten.
 
 #### Ønsker for fremtiden (kan være komplekst):

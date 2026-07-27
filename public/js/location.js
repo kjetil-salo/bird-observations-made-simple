@@ -56,6 +56,21 @@ export function getSiteLabel(site) {
 }
 
 /**
+ * Hent kommune (evt. fylke) for et site
+ * @param {Object} site - Site-objekt
+ * @returns {string} - Kommunenavn, eller tom streng
+ */
+export function getSiteMunicipality(site) {
+  if (!site || typeof site !== 'object') return '';
+
+  const raw = site.raw && typeof site.raw === 'object' ? site.raw : {};
+  const value = site.municipality || raw.municipalityName
+    || site.county || raw.countyName;
+
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
  * Sett AO-site forslag i dropdown
  * @param {Array} sites - Liste med sites
  * @param {Object} currentPosition - Nåværende posisjon {lat, lon}
@@ -172,7 +187,8 @@ export function setAoSiteSuggestions(sites, currentPosition, dropdown, aoSitesEl
     item.style.gap = '8px';
 
     // Tekstdel
-    const textSpan = document.createElement('span');
+    const textSpan = document.createElement('div');
+    textSpan.className = 'ao-site-text';
     textSpan.style.flex = '1';
 
     let label = getSiteLabel(site) || site.name;
@@ -190,6 +206,15 @@ export function setAoSiteSuggestions(sites, currentPosition, dropdown, aoSitesEl
     label = label + distStr;
     textSpan.textContent = label;
     textSpan.tabIndex = 0;
+
+    // Kommune som undertekst — skiller lokaliteter med samme navn
+    const municipality = getSiteMunicipality(site);
+    if (municipality) {
+      const subText = document.createElement('div');
+      subText.textContent = municipality;
+      subText.style.cssText = 'font-size: 0.75em; color: var(--muted);';
+      textSpan.appendChild(subText);
+    }
 
     const selectSite = () => {
       const name = getSiteLabel(site) || site.name;

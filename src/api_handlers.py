@@ -828,6 +828,14 @@ def _normalize_site(item, my_site_ids):
     if lon_val is not None:
         site['lon'] = lon_val
 
+    # Kommune/fylke fra AO — brukes til å skille lokaliteter med samme navn
+    municipality = item.get('municipalityName') or item.get('MunicipalityName')
+    county = item.get('countyName') or item.get('CountyName')
+    if municipality:
+        site['municipality'] = municipality
+    if county:
+        site['county'] = county
+
     # Detekter superlokasjon-status
     try:
         for k in ('isSuper', 'isSuperSite', 'IsSuper', 'IsSuperSite', 'is_super'):
