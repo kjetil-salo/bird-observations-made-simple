@@ -6,6 +6,12 @@ const STORAGE_KEY = 'fugleobservasjoner_v1';
 const MEDOBS_KEY = 'medobs_list_v1';
 const AO_SIZE_KEY = 'ao_search_radius_v1';
 const ACTIVITY_PILLS_KEY = 'activityPills_v1';
+const SENT_KEY = 'sent_observations_v1';
+
+// Sendt-loggen husker hva som faktisk ble sendt, slik at arbeidslista trygt kan
+// tømmes etterpå. Holdes bevisst kort — den er en kvittering, ikke et arkiv.
+export const SENT_MAX_DAYS = 7;
+export const SENT_MAX_OBS = 200;
 
 function todayStr() {
   const d = new Date();
@@ -110,6 +116,76 @@ export function loadObservations() {
     return payload.observations;
   } catch (e) {
     console.warn('Kunne ikke lese fra localStorage', e);
+    return [];
+  }
+}
+
+/**
+ * Fjern for gamle og for mange poster fra sendt-loggen.
+ * Nyeste sending først i lista.
+ * @param {Array} batches - Sendinger, nyeste først
+ * @returns {Array} - Beskåret liste
+ */
+function pruneSentBatches(batches) {
+  const grense = Date.now() - SENT_MAX_DAYS * 86400000;
+  const ferske = batches.filter((b) => {
+    const t = Date.parse(b && b.ts);
+    return !isNaN(t) && t >= grense;
+  });
+
+  // Behold nyeste sendinger til vi når obs-taket
+  const beholdt = [];
+  let antall = 0;
+  for (const b of ferske) {
+    const n = Array.isArray(b.obs) ? b.obs.length : 0;
+    if (beholdt.length && antall + n > SENT_MAX_OBS) break;
+    beholdt.push(b);
+    antall += n;
+  }
+  return beholdt;
+}
+
+/**
+ * Legg en fullført sending til i sendt-loggen.
+ * Kalles ved vellykket publisering — før arbeidslista eventuelt tømmes.
+ * @param {Array} observations - Observasjonene som ble sendt
+ */
+export function appendSentBatch(observations) {
+  if (!window.localStorage || !Array.isArray(observations) || !observations.length) return;
+
+  try {
+    const batches = loadSentBatches();
+    batches.unshift({
+      ts: new Date().toISOString(),
+      obs: JSON.parse(JSON.stringify(observations)),
+    });
+    window.localStorage.setItem(SENT_KEY, JSON.stringify({
+      version: 1,
+      batches: pruneSentBatches(batches),
+    }));
+  } catch (e) {
+    // Full localStorage skal aldri velte appen — sendingen er allerede fullført
+    console.warn('Kunne ikke lagre sendt-logg', e);
+  }
+}
+
+/**
+ * Hent sendt-loggen, nyeste sending først. Gamle poster filtreres bort.
+ * @returns {Array<{ts: string, obs: Array}>}
+ */
+export function loadSentBatches() {
+  if (!window.localStorage) return [];
+
+  try {
+    const raw = window.localStorage.getItem(SENT_KEY);
+    if (!raw) return [];
+
+    const payload = JSON.parse(raw);
+    if (!payload || !Array.isArray(payload.batches)) return [];
+
+    return pruneSentBatches(payload.batches.filter((b) => b && Array.isArray(b.obs)));
+  } catch (e) {
+    console.warn('Kunne ikke lese sendt-logg', e);
     return [];
   }
 }

@@ -1,7 +1,7 @@
 # Rette observasjoner etter sending til AO — vurdering og plan
 
 **Dato:** 2026-07-27
-**Status:** Plan / ikke besluttet
+**Status:** Fase A ikke bygget. **Fase B implementert i v1.41.0** (27.07.2026). Fase C utsatt.
 **Bakgrunn:** Brukeren sender observasjoner til Artsobservasjoner (direktesending), oppdager
 etterpå at noe er feil (art, antall, aktivitet, lokalitet, tid) — og appen har ingen vei tilbake.
 
@@ -125,7 +125,7 @@ Akseptansekriterier:
 
 Estimat: ~2 timer.
 
-### Fase B — «Sendt til AO»-logg med rett-lenke
+### Fase B — «Sendt til AO»-logg med rett-lenke ✅ (v1.41.0)
 
 Appen husker hva som ble sendt, og gir kort vei til retting på AO. **Skriver aldri til AO.**
 
@@ -152,6 +152,12 @@ der fra før (`ao-progress-capture.md`). Kontrollvinduet inneholder altså ikke 
 bare våre rader. ID-er må derfor matches mot våre observasjoner på innhold (art + antall +
 dato + lokalitet) — og ved tvetydig match lagres **ingen** ID heller enn feil ID. En feil
 ID betyr i fase C at vi redigerer feil observasjon.
+
+**Implementert annerledes enn planlagt — dyplenking er ikke mulig.** HAR-fangsten viste at
+redigering åpnes med `POST /ReviewSighting/EditPublishedSightings` (CSRF-token + skjemafelt
+fra feltdagboka), ikke en GET-URL. En `<a href>` rett til én observasjon finnes altså ikke.
+Sendt-loggen lenker derfor til `/User/MyPages`, og ID-fangst er droppet i denne fasen —
+uten en URL å bruke ID-en i gir den ingen verdi ennå. Den blir aktuell igjen i fase C.
 
 **Kilde-valg (avgjøres av fase 0):** hvis AO tilbyr en ren lesing av egne siste funn, er
 den autoritativ og bør være primærkilden — den dekker også obser registrert i AO-appen

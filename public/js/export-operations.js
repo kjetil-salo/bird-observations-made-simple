@@ -4,6 +4,7 @@
 
 import { toCsv } from './observations.js';
 import { flashButton } from './ui.js';
+import { appendSentBatch } from './storage.js';
 
 function _statusColor(type) {
   const light = document.body.classList.contains('theme-light');
@@ -221,6 +222,10 @@ export async function handleDirectSend(observations, dom, callbacks) {
     dom.aoDirectStatus.style.cssText = `display:block;margin-top:8px;padding:10px;border-radius:8px;font-size:0.9rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:${_statusColor('success')};`;
     dom.aoDirectStatus.textContent = `✅ ${importResult.count} observasjon${importResult.count !== 1 ? 'er' : ''} sendt til AO!`;
     fetch('/api/log-export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'direct' }) }).catch(() => {});
+
+    // Husk hva som ble sendt FØR lista eventuelt tømmes — ellers er kvitteringen
+    // borte i samme øyeblikk brukeren svarer «ja» på spørsmålet under.
+    appendSentBatch(observations);
 
     setTimeout(() => {
       if (confirm('Sending vellykket! Vil du tømme observasjonslisten?')) {

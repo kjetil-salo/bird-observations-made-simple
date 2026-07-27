@@ -128,6 +128,10 @@ Pure ES6 modules with no framework:
 - `observations.js` — Main observation form logic
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
+  - **Sendt-logg** (`sent_observations_v1`): `appendSentBatch()` / `loadSentBatches()`
+  - Kvittering for det som er publisert, 7 dager / maks 200 obs (`SENT_MAX_DAYS`, `SENT_MAX_OBS`)
+  - Skrives i `handleDirectSend` **før** «tøm lista»-spørsmålet — ellers er kvitteringen borte
+  - Opprydding skjer ved lesing og skriving; ingen cron
 - `ui.js` — UI state and rendering
 - `share.js` — Deling av funn: forhåndsvisning, lenke-generering og tilbaketrekking
   - «Dagens funn» = **nyeste observasjonsdato i lista**, ikke kalenderdagen (viktig for etterregistrering)

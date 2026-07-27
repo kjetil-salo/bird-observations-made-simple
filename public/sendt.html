@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tidligere sendt</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <style>
+      body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+             background: var(--bg, #0f172a); color: var(--text, #e5e7eb); padding: 16px; margin: 0; }
+      .shell { max-width: 640px; margin: 0 auto; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+      h1 { font-size: 1.25rem; margin: 0; }
+      .back-link { color: var(--accent, #3b82f6); text-decoration: none; font-size: 0.9rem; }
+      .ingress { color: var(--muted, #9ca3af); font-size: 0.85rem; line-height: 1.4; margin: 0 0 18px; }
+      .batch { background: rgba(255,255,255,0.04); border: 1px solid rgba(148,163,184,0.15);
+               border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+      .batch-head { display: flex; justify-content: space-between; align-items: baseline;
+                    gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+      .batch-tid { font-weight: 600; }
+      .batch-meta { color: var(--muted, #9ca3af); font-size: 0.85rem; }
+      .sted { color: #93c5fd; font-size: 0.9rem; margin: 10px 0 4px; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li { padding: 5px 0; font-size: 0.92rem; border-bottom: 1px solid rgba(148,163,184,0.1); }
+      li:last-child { border-bottom: none; }
+      .antall { color: #86efac; font-weight: 600; }
+      .detalj { color: var(--muted, #9ca3af); font-size: 0.85rem; }
+      .knapper { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+      .btn-liten { padding: 7px 12px; border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+                   border: 1px solid rgba(148,163,184,0.25); background: transparent; color: var(--text, #e5e7eb); }
+      .btn-liten.primar { background: var(--accent, #3b82f6); border-color: transparent; color: #fff; }
+      .tom { text-align: center; color: var(--muted, #9ca3af); padding: 40px 16px; line-height: 1.5; }
+      footer { margin-top: 24px; text-align: center; color: var(--muted, #9ca3af); font-size: 0.8rem; line-height: 1.5; }
+      footer a { color: var(--accent, #3b82f6); }
+      body.theme-light { background: #ffffff !important; color: #1a1a1a !important; }
+      body.theme-light .batch { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+      body.theme-light .sted { color: #1d4ed8 !important; }
+      body.theme-light .antall { color: #16a34a !important; }
+    </style>
+  </head>
+  <body>
+    <script src="/js/theme.js"></script>
+    <div class="shell">
+      <header>
+        <h1>📤 Tidligere sendt</h1>
+        <a href="/" class="back-link">← Tilbake</a>
+      </header>
+      <p class="ingress">
+        Kvittering for det du har publisert til Artsobservasjoner de siste 7 dagene.
+        Lagres bare på denne enheten.
+      </p>
+      <div id="liste"></div>
+      <footer>
+        Skal du rette et funn, gjør du det på
+        <a href="https://www.artsobservasjoner.no/User/MyPages" target="_blank" rel="noopener">Mine sider hos Artsobservasjoner</a>.
+      </footer>
+    </div>
+
+    <script type="module">
+      import { loadSentBatches, loadObservations, saveObservations, SENT_MAX_DAYS } from '/js/storage.js';
+      import { openShareDialog } from '/js/share.js';
+
+      const MND = ['januar', 'februar', 'mars', 'april', 'mai', 'juni',
+        'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+
+      function formatSendt(iso) {
+        const d = new Date(iso);
+        if (isNaN(d)) return '';
+        const klokke = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const idag = new Date();
+        const sammeDag = d.toDateString() === idag.toDateString();
+        if (sammeDag) return `I dag kl. ${klokke}`;
+        return `${d.getDate()}. ${MND[d.getMonth()]} kl. ${klokke}`;
+      }
+
+      function tekst(v) {
+        const el = document.createElement('span');
+        el.textContent = v == null ? '' : String(v);
+        return el.innerHTML;
+      }
+
+      function renderBatch(batch, idx) {
+        const obs = batch.obs || [];
+        const arter = new Set(obs.map(o => (o.species && o.species.taxonName || '').toLowerCase()).filter(Boolean));
+
+        // Grupper på lokalitet, i den rekkefølgen de dukker opp
+        const steder = [...new Set(obs.map(o => o.placeName || ''))];
+        const seksjoner = steder.map(sted => {
+          const iGruppe = obs.filter(o => (o.placeName || '') === sted);
+          const rader = iGruppe.map(o => {
+            const navn = (o.species && o.species.taxonName) || '';
+            const tid = (o.timestamp || '').slice(11, 16);
+            const detaljer = [o.activity, o.age, o.gender].filter(Boolean).join(' · ');
+            return `<li><span class="antall">${tekst(o.count || '')}</span> ${tekst(navn)}
+              <span class="detalj">${tid ? ' – ' + tekst(tid) : ''}${detaljer ? ' · ' + tekst(detaljer) : ''}</span></li>`;
+          }).join('');
+          const stedHtml = steder.length > 1 && sted ? `<div class="sted">${tekst(sted)}</div>` : '';
+          return stedHtml + `<ul>${rader}</ul>`;
+        }).join('');
+
+        const stedTekst = steder.filter(Boolean).length === 1 ? ` · ${tekst(steder.filter(Boolean)[0])}` : '';
+
+        return `
+          <div class="batch">
+            <div class="batch-head">
+              <span class="batch-tid">${tekst(formatSendt(batch.ts))}</span>
+              <span class="batch-meta">${obs.length} obs · ${arter.size} art${arter.size !== 1 ? 'er' : ''}${stedTekst}</span>
+            </div>
+            ${seksjoner}
+            <div class="knapper">
+              <button class="btn-liten primar" data-del="${idx}">🔗 Del disse</button>
+              <button class="btn-liten" data-kopier="${idx}">📋 Kopier til lista</button>
+            </div>
+          </div>`;
+      }
+
+      const batches = loadSentBatches();
+      const listeEl = document.getElementById('liste');
+
+      if (!batches.length) {
+        listeEl.innerHTML = `<div class="tom">
+          Ingenting sendt de siste ${SENT_MAX_DAYS} dagene.<br>
+          Når du publiserer til Artsobservasjoner, dukker kvitteringen opp her.
+        </div>`;
+      } else {
+        listeEl.innerHTML = batches.map(renderBatch).join('');
+
+        listeEl.addEventListener('click', (e) => {
+          const delIdx = e.target.dataset && e.target.dataset.del;
+          const kopierIdx = e.target.dataset && e.target.dataset.kopier;
+
+          if (delIdx != null) {
+            openShareDialog(batches[Number(delIdx)].obs || []);
+            return;
+          }
+
+          if (kopierIdx != null) {
+            const obs = batches[Number(kopierIdx)].obs || [];
+            if (!obs.length) return;
+            if (!confirm(`Legge ${obs.length} observasjon${obs.length !== 1 ? 'er' : ''} tilbake i arbeidslista? `
+              + 'De er allerede sendt til AO — send dem bare på nytt hvis du har slettet dem der.')) return;
+
+            // Nytt besøk: fjern visit-koblingen så de ikke smelter sammen med gamle grupper
+            const kopier = obs.map(o => {
+              const kopi = JSON.parse(JSON.stringify(o));
+              delete kopi.visitId;
+              delete kopi.visitLocked;
+              return kopi;
+            });
+            saveObservations([...kopier, ...loadObservations()]);
+            window.location.href = '/';
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
