@@ -72,42 +72,42 @@ function showTimeModal(groupItems, defaultFra, defaultTil, groupName, observatio
     if (!fraVal) { fraInput.focus(); return; }
 
     const now = new Date();
-    const baseRef = groupItems[0]?.timestamp ? new Date(groupItems[0].timestamp) : new Date();
-
     const [fraH, fraM] = fraVal.split(':').map(Number);
-    const fraCheck = new Date(baseRef);
-    fraCheck.setHours(fraH, fraM, 0, 0);
-    if (fraCheck > now) {
+    const [tilH, tilM] = tilVal ? tilVal.split(':').map(Number) : [];
+
+    // Regn ut resultatet for hver obs FØR noe skrives. Gruppen kan spenne over flere
+    // datoer, og da sier første obs ingenting om de andre — tidligere validerte vi bare
+    // mot første obs, mens klokkeslettet ble skrevet på hver obs sin egen dato. En obs
+    // med dagens dato kunne dermed få et tidspunkt frem i tid som AO underkjenner.
+    const beregnet = groupItems.map((obs) => {
+      const baseDate = obs.timestamp ? new Date(obs.timestamp) : new Date();
+      const fraDate = new Date(baseDate);
+      fraDate.setHours(fraH, fraM, 0, 0);
+      let tilDate = null;
+      if (tilVal) {
+        tilDate = new Date(baseDate);
+        tilDate.setHours(tilH, tilM, 0, 0);
+      }
+      return { obs, fraDate, tilDate };
+    });
+
+    if (beregnet.some((b) => b.fraDate > now)) {
       fraInput.style.borderColor = '#ef4444';
       showToast(`Fra-tid ${fraVal} er frem i tid — AO underkjenner`);
       fraInput.focus();
       return;
     }
 
-    if (tilVal) {
-      const [tilH, tilM] = tilVal.split(':').map(Number);
-      const tilCheck = new Date(baseRef);
-      tilCheck.setHours(tilH, tilM, 0, 0);
-      if (tilCheck > now) {
-        tilInput.style.borderColor = '#ef4444';
-        showToast(`Til-tid ${tilVal} er frem i tid — AO underkjenner`);
-        tilInput.focus();
-        return;
-      }
+    if (beregnet.some((b) => b.tilDate && b.tilDate > now)) {
+      tilInput.style.borderColor = '#ef4444';
+      showToast(`Til-tid ${tilVal} er frem i tid — AO underkjenner`);
+      tilInput.focus();
+      return;
     }
 
-    groupItems.forEach(obs => {
-      // Bruk eksisterende dato fra obs, bare oppdater klokkeslett
-      const baseDate = obs.timestamp ? new Date(obs.timestamp) : new Date();
-      const [fraH, fraM] = fraVal.split(':').map(Number);
-      const fraDate = new Date(baseDate);
-      fraDate.setHours(fraH, fraM, 0, 0);
+    beregnet.forEach(({ obs, fraDate, tilDate }) => {
       obs.timestamp = toLocalISOString(fraDate);
-
-      if (tilVal) {
-        const [tilH, tilM] = tilVal.split(':').map(Number);
-        const tilDate = new Date(baseDate);
-        tilDate.setHours(tilH, tilM, 0, 0);
+      if (tilDate) {
         obs.tilKlokkeslett = toLocalISOString(tilDate);
       }
     });

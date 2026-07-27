@@ -93,12 +93,33 @@ export async function handleCopyAndOpen(observations, dom) {
   }
 }
 
+// AO underkjenner observasjoner med tidspunkt frem i tid («Angi et tidspunkt som ikke
+// er passert») — de importeres, men publiseres aldri. Fang dem her, ikke i AOs
+// gjennomgangskø. Observasjoner kan ha fått fremtidig tid via redigering (edit.html),
+// feil dato ved etterregistrering, eller feilstilt klokke.
+function _findFutureObservation(observations) {
+  const now = new Date();
+  return observations.find((o) => {
+    const from = o.timestamp ? new Date(o.timestamp) : null;
+    const to = o.tilKlokkeslett ? new Date(o.tilKlokkeslett) : null;
+    return (from && !isNaN(from) && from > now) || (to && !isNaN(to) && to > now);
+  });
+}
+
 export async function handleDirectSend(observations, dom, callbacks) {
   if (!observations.length) return;
 
   const username = localStorage.getItem('ao_username');
   const password = localStorage.getItem('ao_password');
   if (!username || !password) return;
+
+  const future = _findFutureObservation(observations);
+  if (future) {
+    const navn = (future.species && future.species.taxonName) || 'En observasjon';
+    dom.aoDirectStatus.style.cssText = `display:block;margin-top:8px;padding:10px;border-radius:8px;font-size:0.9rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:${_statusColor('error')};`;
+    dom.aoDirectStatus.textContent = `❌ ${navn} har tidspunkt frem i tid — AO godtar den ikke. Rett tidspunktet før du sender.`;
+    return;
+  }
 
   const total = observations.length;
 
@@ -186,6 +207,17 @@ export async function handleDirectSend(observations, dom, callbacks) {
       t.authCookie = importResult.refreshedAuthCookie;
       localStorage.setItem('ao_tokens', JSON.stringify(t));
     }
+    // AO holder tilbake rader den underkjenner — da er grønn hake feil signal.
+    if (importResult.heldBack) {
+      dom.aoDirectStatus.style.cssText = `display:block;margin-top:8px;padding:10px;border-radius:8px;font-size:0.9rem;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.4);color:${_statusColor('error')};`;
+      const detaljer = importResult.heldBackDetails
+        ? `<br><span style="opacity:.85">${importResult.heldBackDetails}</span>` : '';
+      dom.aoDirectStatus.innerHTML = `⚠️ ${importResult.heldBack} observasjon${importResult.heldBack !== 1 ? 'er' : ''} ble <b>ikke</b> publisert og ligger til gjennomgang på AO.${detaljer}<br>`
+        + '<a href="https://www.artsobservasjoner.no/ReviewSighting" target="_blank" rel="noopener">Åpne gjennomgang</a>';
+      dom.aoDirectBtn.disabled = false;
+      return;
+    }
+
     dom.aoDirectStatus.style.cssText = `display:block;margin-top:8px;padding:10px;border-radius:8px;font-size:0.9rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:${_statusColor('success')};`;
     dom.aoDirectStatus.textContent = `✅ ${importResult.count} observasjon${importResult.count !== 1 ? 'er' : ''} sendt til AO!`;
     fetch('/api/log-export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'direct' }) }).catch(() => {});

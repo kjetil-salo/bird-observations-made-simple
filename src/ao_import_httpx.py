@@ -143,6 +143,88 @@ def number_of_sightings_submitted(login_token, auth_cookie):
     )
 
 
+def review_queue_rows(login_token, auth_cookie, size=200):
+    """
+    Hent gjennomgangskøen som JSON fra AOs eget Kendo-grid-endepunkt.
+
+    `POST /ReviewSighting/BindReviewSightingsGrid` med body `page=1&size=N` gir per rad
+    bl.a. `SightingId`, `TemporarySightingId`, `TaxonName`, `SearchableStartDate`,
+    `TimePresentation`, `ErrorCount` og `TriggeredValidationRulesText`. Bekreftet i
+    HAR-fangst 27.07.2026 — se `docs/ao-rediger-api.md`.
+
+    Returnerer liste av dicts, eller None hvis endepunktet ikke svarer som forventet.
+    """
+    cookies = {
+        'logintoken': login_token,
+        '.ASPXAUTHNO': auth_cookie,
+        'AcceptCookies': '1',
+    }
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': '*/*',
+    }
+    try:
+        with httpx.Client() as client:
+            resp = client.post(
+                'https://www.artsobservasjoner.no/ReviewSighting/BindReviewSightingsGrid',
+                content=f'page=1&size={int(size)}',
+                cookies=cookies, headers=headers, timeout=10,
+            )
+        if resp.status_code != 200:
+            return None
+        rows = resp.json().get('data')
+        return rows if isinstance(rows, list) else None
+    except Exception:
+        return None
+
+
+def _describe_held_back(login_token, auth_cookie, limit=3):
+    """
+    Kort, menneskelig beskrivelse av hva som ble liggende igjen i gjennomgangskøen.
+
+    Gir brukeren «tårnseiler 26.07 15:00» i stedet for bare et tall. Returnerer tom
+    streng hvis køen ikke kan leses — da faller melding tilbake til antall alene.
+    """
+    rows = review_queue_rows(login_token, auth_cookie)
+    if not rows:
+        return ''
+    biter = []
+    for row in rows[:limit]:
+        navn = (row.get('TaxonName') or '').strip() or 'ukjent art'
+        dato = (row.get('SearchableStartDate') or '').strip()
+        tid = (row.get('TimePresentation') or '').strip()
+        regel = (row.get('TriggeredValidationRulesText') or '').strip()
+        tekst = ' '.join(x for x in (navn, dato, tid) if x)
+        if regel:
+            tekst += f' ({regel})'
+        biter.append(tekst)
+    if len(rows) > limit:
+        biter.append(f'+{len(rows) - limit} til')
+    return ', '.join(biter)
+
+
+def _remaining_after_publish(login_token, auth_cookie, timeout=6.0, interval=1.0):
+    """
+    Antall observasjoner som fortsatt ligger i gjennomgangskøen etter publisering.
+
+    AO publiserer ikke rader den underkjenner (typisk «Angi et tidspunkt som ikke er
+    passert» ved tidspunkt frem i tid) — de blir liggende i køen. Uten denne sjekken
+    meldte appen «sendt til AO!» selv om observasjonen aldri ble publisert.
+
+    Returnerer antall gjenværende, eller None hvis endepunktet ikke svarer.
+    """
+    deadline = time.time() + timeout
+    remaining = None
+    while time.time() < deadline:
+        remaining = number_of_sightings_submitted(login_token, auth_cookie)
+        if remaining is None or remaining == 0:
+            return remaining
+        time.sleep(interval)
+    return remaining
+
+
 def _poll_importing_done(login_token, auth_cookie, total, progress_cb=None,
                          timeout=30.0, interval=0.7):
     """
@@ -300,14 +382,26 @@ def post_with_curl(observations, login_token=None, auth_cookie=None, area_id='',
             'refreshedAuthCookie': refreshed_auth
         }
 
+    # Steg 4: Verifiser at køen faktisk ble tømt. Rader AO underkjenner blir liggende,
+    # og da er «publisert» en løgn overfor brukeren.
+    held_back = _remaining_after_publish(login_token, auth_cookie)
+
     published_count = len(observations)
-    return {
+    result = {
         'success': True,
         'message': f'{published_count} observasjoner importert og publisert',
         'count': published_count,
         'published': True,
         'refreshedAuthCookie': refreshed_auth
     }
+    if held_back:
+        detaljer = _describe_held_back(login_token, auth_cookie)
+        logger.warning(f'[AO-HTTPX] {held_back} observasjon(er) ble ikke publisert: {detaljer or "ukjent årsak"}')
+        result['heldBack'] = held_back
+        result['heldBackDetails'] = detaljer
+        result['message'] = (f'{published_count} importert, men {held_back} ble ikke publisert '
+                             '— de ligger til gjennomgang på AO')
+    return result
 
 
 def publish_all(login_token, auth_cookie):

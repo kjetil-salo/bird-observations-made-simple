@@ -272,10 +272,27 @@
         obs.gender = fGender.value || '';
         obs.placeName = fPlace.value.trim();
         // Dato og klokkeslett
-        obs.timestamp = updateDateTimeInIso(obs.timestamp, fDate.value, fTimeFrom.value);
-        if (fTimeTo.value) {
-          // Til-klokkeslett bruker samme dato som fra-dato
-          obs.tilKlokkeslett = updateDateTimeInIso(obs.tilKlokkeslett || obs.timestamp, fDate.value, fTimeTo.value);
+        const nyTimestamp = updateDateTimeInIso(obs.timestamp, fDate.value, fTimeFrom.value);
+        const nyTilKlokkeslett = fTimeTo.value
+          ? updateDateTimeInIso(obs.tilKlokkeslett || obs.timestamp, fDate.value, fTimeTo.value)
+          : null;
+
+        // AO underkjenner tidspunkt frem i tid — samme regel som ved registrering
+        // (observation-commit.js). Uten denne kunne redigering smugle inn en
+        // observasjon AO importerer, men aldri publiserer.
+        const naa = new Date();
+        if (new Date(nyTimestamp) > naa) {
+          alert('Fra-tidspunkt er frem i tid — AO underkjenner observasjonen');
+          return;
+        }
+        if (nyTilKlokkeslett && new Date(nyTilKlokkeslett) > naa) {
+          alert('Til-tidspunkt er frem i tid — AO underkjenner observasjonen');
+          return;
+        }
+
+        obs.timestamp = nyTimestamp;
+        if (nyTilKlokkeslett) {
+          obs.tilKlokkeslett = nyTilKlokkeslett;
         } else {
           // Fjern tilKlokkeslett hvis tom
           delete obs.tilKlokkeslett;

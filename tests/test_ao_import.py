@@ -357,6 +357,64 @@ def test_post_with_curl_success(monkeypatch):
     assert mock_client.post.called
 
 
+def test_post_with_curl_reports_held_back(monkeypatch):
+    """Rader AO underkjenner blir liggende i gjennomgangskøen — det skal meldes fra om."""
+    monkeypatch.setattr('src.ao_import_httpx.fetch_csrf_tokens',
+                        lambda lt, ac: ('FORM123', 'COOKIE456', None))
+
+    mock_response = Mock()
+    mock_response.text = '<html><body>Import vellykket</body></html>'
+    mock_response.status_code = 200
+
+    mock_client = Mock()
+    mock_client.__enter__ = Mock(return_value=mock_client)
+    mock_client.__exit__ = Mock(return_value=None)
+    mock_client.post = Mock(return_value=mock_response)
+
+    monkeypatch.setattr('httpx.Client', lambda: mock_client)
+    monkeypatch.setattr('time.sleep', lambda x: None)
+    monkeypatch.setattr('src.ao_import_httpx.publish_all', lambda lt, ac: {'status': 200})
+    # AO svarer at én observasjon fortsatt ligger til gjennomgang etter publisering
+    monkeypatch.setattr('src.ao_import_httpx.number_of_sightings_submitted', lambda lt, ac: 1)
+
+    observations = [
+        {'species': {'taxonName': 'Tårnseiler'}, 'count': '6', 'timestamp': '2024-01-15T14:00:00Z', 'placeName': 'Hylkje'}
+    ]
+    result = post_with_curl(observations, 'LOGIN123', 'AUTH456')
+
+    assert result['success'] is True
+    assert result['heldBack'] == 1
+    assert 'ikke publisert' in result['message']
+
+
+def test_post_with_curl_no_held_back_when_queue_empty(monkeypatch):
+    """Tom gjennomgangskø etter publisering → ingen heldBack, ren suksess."""
+    monkeypatch.setattr('src.ao_import_httpx.fetch_csrf_tokens',
+                        lambda lt, ac: ('FORM123', 'COOKIE456', None))
+
+    mock_response = Mock()
+    mock_response.text = '<html><body>OK</body></html>'
+    mock_response.status_code = 200
+
+    mock_client = Mock()
+    mock_client.__enter__ = Mock(return_value=mock_client)
+    mock_client.__exit__ = Mock(return_value=None)
+    mock_client.post = Mock(return_value=mock_response)
+
+    monkeypatch.setattr('httpx.Client', lambda: mock_client)
+    monkeypatch.setattr('time.sleep', lambda x: None)
+    monkeypatch.setattr('src.ao_import_httpx.publish_all', lambda lt, ac: {'status': 200})
+    monkeypatch.setattr('src.ao_import_httpx.number_of_sightings_submitted', lambda lt, ac: 0)
+
+    observations = [
+        {'species': {'taxonName': 'Gråspurv'}, 'count': '1', 'timestamp': '2024-01-15T14:00:00Z', 'placeName': 'Oslo'}
+    ]
+    result = post_with_curl(observations, 'LOGIN123', 'AUTH456')
+
+    assert result['success'] is True
+    assert 'heldBack' not in result
+
+
 # ============================================================================
 # Del 4: publish_all Flow
 # ============================================================================
