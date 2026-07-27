@@ -87,6 +87,13 @@ The `Handler` class routes requests:
   - Sender eier-varsel via `src/email_notify.py` i bakgrunnstråd (best effort, `Reply-To` = melder)
 - `/api/feedback-status` (POST, key-protected) → oppdaterer status på en sak (ny/under_arbeid/løst/avvist)
 - `/feedback?key=X` → key-beskyttet admin-visning av tilbakemeldinger (statusfilter + statusendring)
+- `/api/share` (POST) → lager delbar lenke av valgte observasjoner, returnerer `{slug, url, deleteKey, expiresTs}`
+  - Lagres i `src/share_store.py` (SQLite, samme `stats.db`). Slug: 12 tegn fra entydig alfabet
+  - **Personvern:** hvitelisting av felt — koordinater lagres aldri, `hideUntil`-obser slippes ikke gjennom
+  - Levetid 14 dager (`SHARE_TTL_DAYS`). Utløp uten cron: `DELETE WHERE expires_ts < now` ved hver skriving
+  - Spam-vern: egen per-IP-kvote (10/10 min), maks 200 obs og ~100 KB per deling
+- `/api/share-delete` (POST) → trekker tilbake en deling; krever `slug` + `deleteKey`
+- `/d/<slug>` → offentlig delingsside. Ukjent og utløpt slug gir **samme** 404-side (ingen enumerering)
 - `/stats?key=X` → displays analytics (key-protected)
 - `/health` → health check endpoint
 
@@ -101,6 +108,10 @@ The `Handler` class routes requests:
   - Prioritet: SMTP (`SMTP_HOST`+`SMTP_USER`+`SMTP_PASS` via smtplib/STARTTLS) → Resend → SMTP2GO HTTP
   - `Reply-To` settes til melderens epost → «Svar» går rett til brukeren. 1 retry ved forbigående feil
   - **Prod bruker SMTP2GO** (gjenbruker drivstoff-appens creds): `mail-eu.smtp2go.com:2525`, From `noreply@drivstoffprisene.no`
+- `share_store.py` — SQLite-lagring av delte observasjonslister (samme `stats.db`)
+  - Schema: `slug, payload, display_name, delete_key, created_ts, expires_ts, views`
+  - `sanitize_observations()` hviteliste-filtrerer felt — nye obs-felt lekker ikke ut ved uhell
+  - Bevisst **ikke** Redis: SQLite gir persistens, backup og «utløpt»-melding gratis. Se `docs/deling-av-observasjoner-plan.md`
 - `location_db.py` — SQLite-cache for AO-lokasjoner (delt mellom containere via Docker-volum)
   - Aktiveres med `LOCATION_DB_PATH` env-var
   - Schema: `ao_id, name, lat, lon, is_private, is_super, parent_id, municipality, county, source`
@@ -118,6 +129,9 @@ Pure ES6 modules with no framework:
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
 - `ui.js` — UI state and rendering
+- `share.js` — Deling av funn: forhåndsvisning, lenke-generering og tilbaketrekking
+  - «Dagens funn» = **nyeste observasjonsdato i lista**, ikke kalenderdagen (viktig for etterregistrering)
+  - Lagrer visningsnavn i `shareDisplayName_v1` og egne delinger i `myShares_v1`
 - `autocomplete.js` — Lokalitet-autocomplete med avstand og ikoner (🏷️ super, 👤 privat, ⭐ mine)
   - Aktivt i **begge** modi (Felt og Etterregistrering)
   - `initAutocomplete(placeInput, onSelect, getPosition)` — getPosition gir GPS-posisjon for sortering

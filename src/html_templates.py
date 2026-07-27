@@ -401,3 +401,193 @@ def generate_feedback_admin_page(items, counts, key, status_filter=''):
 </body>
 </html>
 """
+
+
+_MND = ['januar', 'februar', 'mars', 'april', 'mai', 'juni',
+        'juli', 'august', 'september', 'oktober', 'november', 'desember']
+
+
+def _norsk_dato(iso):
+    """«2026-07-27T15:00:00» → «27. juli 2026». Tom streng hvis ugyldig."""
+    if not iso or len(iso) < 10:
+        return ''
+    try:
+        aar, mnd, dag = int(iso[0:4]), int(iso[5:7]), int(iso[8:10])
+        return f'{dag}. {_MND[mnd - 1]} {aar}'
+    except (ValueError, IndexError):
+        return ''
+
+
+def _klokke(obs):
+    """«15:00» eller «15:00–16:30» ut fra timestamp/tilKlokkeslett."""
+    fra = (obs.get('timestamp') or '')[11:16]
+    til = (obs.get('tilKlokkeslett') or '')[11:16]
+    if fra and til and til != fra:
+        return f'{fra}–{til}'
+    return fra
+
+
+def generate_share_page(share, base_url=''):
+    """
+    Generer den offentlige delingssiden for et sett observasjoner.
+
+    Alt brukerinnhold escapes. Kun feltene share_store slipper gjennom vises —
+    aldri koordinater. Egne OG-tagger gjør at lenken ser pen ut limt inn i
+    Messenger/Facebook.
+    """
+    obs_list = share.get('observations') or []
+    navn = (share.get('display_name') or '').strip()
+    eier = _html.escape(navn) if navn else 'En fuglekikker'
+
+    datoer = sorted({(o.get('timestamp') or '')[:10] for o in obs_list if o.get('timestamp')})
+    dato_tekst = _norsk_dato(datoer[-1] + 'T00:00:00') if datoer else ''
+    if len(datoer) > 1:
+        forste = _norsk_dato(datoer[0] + 'T00:00:00')
+        dato_tekst = f'{forste} – {dato_tekst}'
+
+    arter = len({o.get('taxonName', '').lower() for o in obs_list if o.get('taxonName')})
+    steder = [s for s in dict.fromkeys(o.get('placeName', '') for o in obs_list) if s]
+
+    # Grupper på lokalitet, i den rekkefølgen lokalitetene dukker opp
+    grupper = []
+    for sted in steder or ['']:
+        i_gruppe = [o for o in obs_list if (o.get('placeName') or '') == sted]
+        if i_gruppe:
+            grupper.append((sted, i_gruppe))
+    if not steder:
+        grupper = [('', obs_list)]
+
+    seksjoner = []
+    for sted, i_gruppe in grupper:
+        rader = []
+        for o in i_gruppe:
+            antall = o.get('count')
+            antall_html = f'<span class="antall">{antall}</span> ' if antall else ''
+            detaljer = [d for d in (o.get('activity'), o.get('age'), o.get('gender')) if d]
+            detalj_html = (f'<div class="detalj">{_html.escape(" · ".join(detaljer))}</div>'
+                           if detaljer else '')
+            kommentar = o.get('comment')
+            kommentar_html = (f'<div class="kommentar">{_html.escape(kommentar)}</div>'
+                              if kommentar else '')
+            rader.append(f"""
+          <li>
+            <div class="art">{antall_html}{_html.escape(o.get('taxonName', ''))}</div>
+            <div class="tid">{_html.escape(_klokke(o))}</div>
+            {detalj_html}{kommentar_html}
+          </li>""")
+        # Med bare én lokalitet står navnet allerede i ingressen — ikke gjenta det
+        vis_sted = sted and len(grupper) > 1
+        sted_html = f'<h2>{_html.escape(sted)}</h2>' if vis_sted else ''
+        seksjoner.append(f'<section>{sted_html}<ul>{"".join(rader)}</ul></section>')
+
+    tittel = f'{eier} så {arter} art{"er" if arter != 1 else ""}'
+    if dato_tekst:
+        tittel += f' – {dato_tekst}'
+    beskrivelse = f'{len(obs_list)} observasjon{"er" if len(obs_list) != 1 else ""}'
+    if steder:
+        beskrivelse += f' på {_html.escape(steder[0])}'
+        if len(steder) > 1:
+            beskrivelse += f' +{len(steder) - 1} sted{"er" if len(steder) > 2 else ""}'
+
+    og_image = f'{base_url}/img/og-image.png' if base_url else '/img/og-image.png'
+
+    return f"""<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{tittel}</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta property="og:title" content="{tittel}" />
+  <meta property="og:description" content="{beskrivelse}" />
+  <meta property="og:image" content="{og_image}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    :root {{ color-scheme: light dark; }}
+    body {{ font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+           margin: 0; padding: 24px 16px 48px; background: #0f172a; color: #e5e7eb;
+           line-height: 1.5; }}
+    .wrap {{ max-width: 560px; margin: 0 auto; }}
+    header {{ margin-bottom: 24px; }}
+    h1 {{ font-size: 1.5rem; margin: 0 0 4px; }}
+    .meta {{ color: #94a3b8; font-size: 0.95rem; }}
+    section {{ background: rgba(255,255,255,0.04); border-radius: 12px;
+              padding: 4px 16px 12px; margin-bottom: 16px; }}
+    h2 {{ font-size: 1rem; color: #93c5fd; margin: 16px 0 8px; }}
+    ul {{ list-style: none; margin: 0; padding: 0; }}
+    li {{ padding: 10px 0; border-bottom: 1px solid rgba(148,163,184,0.15); }}
+    li:last-child {{ border-bottom: none; }}
+    .art {{ font-weight: 600; }}
+    .antall {{ color: #86efac; }}
+    .tid {{ float: right; color: #94a3b8; font-size: 0.9rem; }}
+    .detalj {{ color: #94a3b8; font-size: 0.9rem; }}
+    .kommentar {{ color: #cbd5e1; font-size: 0.9rem; font-style: italic; margin-top: 4px; }}
+    footer {{ margin-top: 32px; text-align: center; color: #64748b; font-size: 0.85rem; }}
+    footer a {{ color: #93c5fd; }}
+    @media (prefers-color-scheme: light) {{
+      body {{ background: #ffffff; color: #1a1a1a; }}
+      .meta, .detalj, .tid {{ color: #64748b; }}
+      section {{ background: #f8fafc; }}
+      h2 {{ color: #1d4ed8; }}
+      .antall {{ color: #16a34a; }}
+      .kommentar {{ color: #334155; }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>{tittel}</h1>
+      <div class="meta">{beskrivelse}</div>
+    </header>
+    {''.join(seksjoner)}
+    <footer>
+      Delt fra <a href="/">Enkel-AO</a> · lenken slutter å virke etter en tid
+    </footer>
+  </div>
+</body>
+</html>
+"""
+
+
+def generate_share_missing_page():
+    """
+    Side for lenker som er utløpt eller aldri har eksistert.
+
+    Bevisst samme side for begge tilfeller — ellers kan man teste seg fram til
+    hvilke slugs som finnes.
+    """
+    return """<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Delingen er ikke tilgjengelig</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+           background: #0f172a; color: #e5e7eb; display: flex; min-height: 100vh;
+           align-items: center; justify-content: center; margin: 0; padding: 24px; }
+    .kort { max-width: 420px; text-align: center; }
+    h1 { font-size: 1.3rem; margin-bottom: 8px; }
+    p { color: #94a3b8; line-height: 1.5; }
+    a { color: #93c5fd; }
+    @media (prefers-color-scheme: light) {
+      body { background: #ffffff; color: #1a1a1a; }
+      p { color: #64748b; }
+    }
+  </style>
+</head>
+<body>
+  <div class="kort">
+    <h1>🔍 Denne delingen er ikke tilgjengelig</h1>
+    <p>Delinger slutter å virke etter en tid, og kan også trekkes tilbake av den
+       som delte dem. Spør gjerne om en ny lenke.</p>
+    <p><a href="/">Til Enkel-AO</a></p>
+  </div>
+</body>
+</html>
+"""

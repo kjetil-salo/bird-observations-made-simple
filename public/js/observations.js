@@ -615,6 +615,7 @@ export function renderObservations(observations, obsListEl, buttons, saveState) 
   if (buttons.exportBtn) buttons.exportBtn.disabled = false;
   if (buttons.copyBtn) buttons.copyBtn.disabled = false;
   if (buttons.copyOpenBtn) buttons.copyOpenBtn.disabled = false;
+  if (buttons.shareBtn) buttons.shareBtn.disabled = false;
   if (buttons.clearBtn) buttons.clearBtn.disabled = false;
   if (buttons.aoDirectBtn) buttons.aoDirectBtn.disabled = false;
 }

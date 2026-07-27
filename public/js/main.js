@@ -15,6 +15,7 @@ import { updateSectionStates, pulseSearchFieldAndFocus } from './form-state.js';
 import { fetchResults, renderResults, chooseItem, updateSubtaxaCheckboxState } from './species-search.js';
 import { commitObservation, renderActivityPills } from './observation-commit.js';
 import { handleExport, handleCopy, handleCopyAndOpen, handleClear, handleDirectSend } from './export-operations.js';
+import { openShareDialog } from './share.js';
 import { initAutocomplete } from './autocomplete.js';
 import { initNewsSplash } from './news-splash.js';
 import { initFirstRunHint } from './first-run-hint.js';
@@ -58,6 +59,7 @@ const dom = {
   exportBtn: document.getElementById('export-btn'),
   copyBtn: document.getElementById('copy-btn'),
   copyOpenBtn: document.getElementById('copy-open-btn'),
+  shareBtn: document.getElementById('share-btn'),
   clearBtn: document.getElementById('clear-btn'),
   aoDirectBtn: document.getElementById('ao-direct-btn'),
   aoDirectRow: document.getElementById('ao-direct-row'),
@@ -114,7 +116,7 @@ function loadState() {
 }
 
 function doRenderObservations() {
-  const buttons = { exportBtn: dom.exportBtn, copyBtn: dom.copyBtn, copyOpenBtn: dom.copyOpenBtn, clearBtn: dom.clearBtn, aoDirectBtn: dom.aoDirectBtn };
+  const buttons = { exportBtn: dom.exportBtn, copyBtn: dom.copyBtn, copyOpenBtn: dom.copyOpenBtn, shareBtn: dom.shareBtn, clearBtn: dom.clearBtn, aoDirectBtn: dom.aoDirectBtn };
   renderObservations(appState.observations, dom.obsListEl, buttons, saveState);
 }
 
@@ -374,6 +376,7 @@ window.updateMapBtnVisibility = updateMapBtnVisibility;
   if (dom.exportBtn) dom.exportBtn.addEventListener('click', () => handleExport(appState.observations, dom));
   if (dom.copyBtn) dom.copyBtn.addEventListener('click', () => handleCopy(appState.observations, dom));
   if (dom.copyOpenBtn) dom.copyOpenBtn.addEventListener('click', () => handleCopyAndOpen(appState.observations, dom));
+  if (dom.shareBtn) dom.shareBtn.addEventListener('click', () => openShareDialog(appState.observations));
   if (dom.clearBtn) dom.clearBtn.addEventListener('click', () => handleClear(appState.observations, dom, callbacks));
   if (dom.aoDirectBtn) dom.aoDirectBtn.addEventListener('click', () => handleDirectSend(appState.observations, dom, callbacks));
 }

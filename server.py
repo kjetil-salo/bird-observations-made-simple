@@ -52,9 +52,12 @@ logging.basicConfig(
 logger = logging.getLogger('fugleobs')
 
 from src.api_handlers import handle_species_search, handle_reverse_geocoding, handle_ao_sites_search, login_to_ao, mask_token
-from src.html_templates import generate_stats_login_page, generate_stats_page, generate_error_page, generate_feedback_admin_page
+from src.html_templates import (generate_stats_login_page, generate_stats_page, generate_error_page,
+                                generate_feedback_admin_page, generate_share_page,
+                                generate_share_missing_page)
 from src import stats_store
 from src import feedback_store
+from src import share_store
 from src import email_notify
 from src.utils import parse_user_agent
 from src.ao_import_httpx import post_with_curl
@@ -87,6 +90,26 @@ _feedback_lock = threading.Lock()
 _feedback_hits = {}  # ip -> liste av unix-tidsstempler
 FEEDBACK_MAX_PER_WINDOW = 5
 FEEDBACK_WINDOW_SEC = 600
+
+# Deling har egen kvote — den som deler flere turlister skal ikke miste
+# muligheten til å melde fra om en feil, og omvendt.
+_share_hits = {}
+SHARE_MAX_PER_WINDOW = 10
+SHARE_WINDOW_SEC = 600
+
+
+def _rate_ok(hits, ip, max_per_window, window_sec):
+    """Vindusbasert throttling for anonyme skrive-endepunkter."""
+    import time
+    now = time.time()
+    with _feedback_lock:
+        nylige = [t for t in hits.get(ip, []) if now - t < window_sec]
+        if len(nylige) >= max_per_window:
+            hits[ip] = nylige
+            return False
+        nylige.append(now)
+        hits[ip] = nylige
+        return True
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -134,6 +157,14 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path == '/api/ao-search-observers':
             self._handle_ao_search_observers_post()
+            return
+
+        if parsed.path == '/api/share':
+            self._handle_share_post()
+            return
+
+        if parsed.path == '/api/share-delete':
+            self._handle_share_delete_post()
             return
 
         if parsed.path == '/api/feedback':
@@ -279,16 +310,68 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _feedback_rate_ok(self, ip):
         """True hvis IP-en ikke har oversteget throttlegrensen for tilbakemeldinger."""
-        import time
-        now = time.time()
-        with _feedback_lock:
-            hits = [t for t in _feedback_hits.get(ip, []) if now - t < FEEDBACK_WINDOW_SEC]
-            if len(hits) >= FEEDBACK_MAX_PER_WINDOW:
-                _feedback_hits[ip] = hits
-                return False
-            hits.append(now)
-            _feedback_hits[ip] = hits
-            return True
+        return _rate_ok(_feedback_hits, ip, FEEDBACK_MAX_PER_WINDOW, FEEDBACK_WINDOW_SEC)
+
+    def _client_ip(self):
+        """Klientens IP — bak Cloudflare ligger den i X-Forwarded-For."""
+        xff = self.headers.get('X-Forwarded-For')
+        return xff.split(',')[0].strip() if xff else self.client_address[0]
+
+    def _handle_share_post(self):
+        """Lag en delbar lenke av observasjonene brukeren har valgt."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+            data = json.loads(body)
+
+            if not _rate_ok(_share_hits, self._client_ip(), SHARE_MAX_PER_WINDOW, SHARE_WINDOW_SEC):
+                self._send_json({'error': 'For mange delinger — prøv igjen om litt.'}, status=429)
+                return
+
+            result = share_store.create_share(
+                data.get('observations', []),
+                display_name=data.get('displayName', ''),
+            )
+            if not result:
+                self._send_json({'error': 'Ingen observasjoner å dele'}, status=400)
+                return
+
+            logger.info(f"[SHARE] Ny deling {result['slug']}")
+            self._send_json({
+                'ok': True,
+                'slug': result['slug'],
+                'url': f"/d/{result['slug']}",
+                'deleteKey': result['deleteKey'],
+                'expiresTs': result['expiresTs'],
+            })
+        except Exception as e:
+            logger.error(f'[SHARE] Feil ved oppretting: {e}')
+            self._send_json({'error': 'Kunne ikke lage deling'}, status=500)
+
+    def _handle_share_delete_post(self):
+        """Trekk tilbake en deling. Krever nøkkelen som ble utstedt ved oppretting."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+            data = json.loads(body)
+
+            ok = share_store.delete_share(data.get('slug', ''), data.get('deleteKey', ''))
+            self._send_json({'ok': ok}, status=200 if ok else 404)
+        except Exception as e:
+            logger.error(f'[SHARE] Feil ved sletting: {e}')
+            self._send_json({'error': 'Kunne ikke slette deling'}, status=500)
+
+    def _handle_share_page(self, parsed):
+        """Vis en delt observasjonsliste. Ukjent og utløpt lenke gir samme side."""
+        slug = parsed.path[len('/d/'):].strip('/')
+        share = share_store.get_share(slug)
+        if not share:
+            self._send_html_response(generate_share_missing_page(), status=404)
+            return
+
+        host = self.headers.get('Host', '')
+        base_url = f'https://{host}' if host else ''
+        self._send_html_response(generate_share_page(share, base_url=base_url))
 
     def _handle_feedback_post(self):
         """Ta imot en brukertilbakemelding (feil/ønske) fra anonym bruker."""
@@ -636,6 +719,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             if parsed.path == '/feedback':
                 self._handle_feedback_page(parsed)
+                return
+            if parsed.path.startswith('/d/'):
+                self._handle_share_page(parsed)
                 return
             elif parsed.path == '/api/species':
                 self._handle_species_api(parsed)
