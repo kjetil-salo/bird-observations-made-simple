@@ -119,9 +119,14 @@
       const listeEl = document.getElementById('liste');
 
       if (!batches.length) {
+        // Loggen kan ikke fylles bakover — funn sendt før denne funksjonen fantes
+        // ble aldri lagret. Si det, i stedet for å påstå at ingenting er sendt.
         listeEl.innerHTML = `<div class="tom">
-          Ingenting sendt de siste ${SENT_MAX_DAYS} dagene.<br>
-          Når du publiserer til Artsobservasjoner, dukker kvitteringen opp her.
+          Ingen kvitteringer her ennå.<br>
+          Neste gang du publiserer til Artsobservasjoner, dukker den opp — og blir
+          liggende i ${SENT_MAX_DAYS} dager.
+          <br><br><span style="font-size:0.85em;opacity:0.75;">
+          Funn du sendte før denne funksjonen kom, er ikke med.</span>
         </div>`;
       } else {
         listeEl.innerHTML = batches.map(renderBatch).join('');

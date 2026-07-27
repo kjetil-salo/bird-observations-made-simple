@@ -214,5 +214,8 @@ AO_URL=http://localhost:8080 AO_MOBILE_URL=http://localhost:8080 python3 server.
 ### Versjonering
 Ved ny versjon (git tag), gjør alltid følgende:
 1. Oppdater `VERSION` i `public/js/version.js` (brukes av index.html og help.html footers)
-2. Oppdater `public/changelog.html` med kort beskrivelse av hva som er nytt
-3. Oppdater relevant dokumentasjon i `docs/` hvis funksjonalitet er endret
+2. **Bump `CACHE_NAME` i `public/sw.js`** (`fugleobs-vNN` → `vNN+1`). **Uten dette henter
+   installerte PWA-er aldri ny JS** — sw.js må endres for at nettleseren skal trigge
+   install/activate. Nye JS-moduler må også legges til i `STATIC_ASSETS`.
+3. Oppdater `public/changelog.html` med kort beskrivelse av hva som er nytt
+4. Oppdater relevant dokumentasjon i `docs/` hvis funksjonalitet er endret
