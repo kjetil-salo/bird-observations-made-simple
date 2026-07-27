@@ -2,6 +2,15 @@
 
 ## ✅ Gjennomførte forbedringer (nyeste)
 
+### v1.39.1–v1.42.0 (27. juli 2026) — sending, deling og retting
+Se **[sending-deling-2026-07.md](sending-deling-2026-07.md)** for full oversikt.
+- Appen meldte suksess på funn AO faktisk ikke publiserte — nå verifiseres køen etter publisering
+- Tre hull i valideringen av tidspunkt frem i tid tettet (edit.html, gruppe-klokkeslett, før sending)
+- Deling av funn via hemmelig lenke (`/d/<slug>`), 14 dagers levetid, uten koordinater
+- Sendt-logg: kvittering for publiserte funn i 7 dager, med deling og «kopier til lista»
+- Dublett-vern: «✓ sendt»-merke og advarsel før noe sendes to ganger
+- AOs redigerings-API kartlagt (`ao-rediger-api.md`); redigering i appen utsatt til etter lansering
+
 ### 🎨 UI/UX Forbedringer
 - **Visuell seksjonering**: Tydelige bokser skiller obligatoriske og valgfrie felt
 - **Korrekt visuelt hierarki**: Grønne bokser for obligatoriske felt, grå for valgfrie
