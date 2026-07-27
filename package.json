@@ -11,9 +11,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
-    "@vitest/ui": "^4.0.17",
-    "jsdom": "^27.4.0",
-    "vitest": "^4.0.17"
+    "@playwright/test": "^1.62.0",
+    "@vitest/ui": "^4.1.10",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.10"
   }
 }
