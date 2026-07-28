@@ -375,7 +375,10 @@ def _refresh_with_logintoken(login_token: str, user_id: str) -> str:
 
             # Revival mislyktes hvis vi havnet på login-siden
             if '/LogOn' in str(response.url):
-                logger.debug('[LOGINTOKEN-REFRESH] Revival mislyktes (redirect til /LogOn)')
+                logger.warning(
+                    f'[LOGINTOKEN-REFRESH] AO nektet revival for user_id={user_id} '
+                    f'— redirect til {response.url} (status={response.status_code})'
+                )
                 return None
 
             for cookie in client.cookies.jar:
@@ -383,7 +386,13 @@ def _refresh_with_logintoken(login_token: str, user_id: str) -> str:
                     logger.info(f'[LOGINTOKEN-REFRESH] Session gjenopprettet via husk-meg: {mask_token(cookie.value)}')
                     return cookie.value
 
-        logger.debug('[LOGINTOKEN-REFRESH] Ingen .ASPXAUTHNO mottatt')
+            # Ingen auth-cookie: AO svarte uten å redirecte, men satte den ikke.
+            # Cookie-navnene viser om AO ignorerte token eller ga noe uventet.
+            cookie_names = ', '.join(sorted(c.name for c in client.cookies.jar)) or 'ingen'
+            logger.warning(
+                f'[LOGINTOKEN-REFRESH] Ingen .ASPXAUTHNO mottatt for user_id={user_id} '
+                f'(status={response.status_code}, cookies: {cookie_names})'
+            )
         return None
     except Exception as e:
         logger.error(f'[LOGINTOKEN-REFRESH] Feil: {e}')
@@ -406,6 +415,9 @@ def _full_relogin(user_id: str, login_token: str = None) -> str:
         if new_cookie:
             logger.error(f'[AUTH-RELOGIN-RESULT] Logintoken-refresh vellykket for user_id={user_id}')
             return new_cookie
+    else:
+        # Uten token er revival umulig — skiller «AO nektet» fra «token kom aldri fram»
+        logger.warning(f'[LOGINTOKEN-REFRESH] Hoppet over for user_id={user_id} — klienten sendte ingen logintoken')
 
     # Steg 2: Full relogin med lagrede credentials (fra disk)
     creds = _load_credentials(user_id)
