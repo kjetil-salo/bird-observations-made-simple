@@ -20,6 +20,26 @@
       body.theme-light .card { background: #ffffff !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
       body.theme-light input, body.theme-light select { background: #ffffff !important; color: #1a1a1a !important; border-color: #cbd5e1 !important; }
       body.theme-light label { color: #64748b !important; }
+      /* Autocomplete for medobservatør-søk */
+      .medobs-ac-wrap { position: relative; flex: 1; }
+      .medobs-ac-list {
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+        background: var(--card-bg, #1e293b); border: 1px solid var(--border, rgba(148,163,184,0.25));
+        border-radius: 8px; max-height: 200px; overflow-y: auto;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: none;
+      }
+      .medobs-ac-list.show { display: block; }
+      .medobs-ac-item {
+        padding: 8px 10px; cursor: pointer; font-size: 0.95em;
+        border-bottom: 1px solid rgba(148,163,184,0.08);
+      }
+      .medobs-ac-item:last-child { border-bottom: none; }
+      .medobs-ac-item:hover, .medobs-ac-item.active { background: rgba(59,130,246,0.2); }
+      .medobs-ac-item .ac-city { font-size: 0.8em; color: var(--muted, #9ca3af); margin-left: 6px; }
+      .medobs-ac-item .ac-fav { color: #f59e0b; margin-right: 4px; font-size: 0.85em; }
+      .medobs-ac-spinner { padding: 8px 10px; font-size: 0.85em; color: var(--muted); }
+      body.theme-light .medobs-ac-list { background: #ffffff; border-color: #cbd5e1; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+      body.theme-light .medobs-ac-item:hover, body.theme-light .medobs-ac-item.active { background: rgba(59,130,246,0.1); }
     </style>
   </head>
   <body>
@@ -355,9 +375,8 @@
         });
       }
 
-      document.getElementById('medobs-new-add-btn').addEventListener('click', () => {
-        const inp = document.getElementById('medobs-new-name');
-        const name = inp.value.trim();
+      function addCoObserver(rawName) {
+        const name = rawName.trim();
         if (!name) return;
         if (!selectedCoObservers.has(name) && selectedCoObservers.size >= MEDOBS_MAX) {
           alert(`Maks ${MEDOBS_MAX} medobservatører per observasjon.`);
@@ -370,9 +389,129 @@
           master.push({ name, active: false });
           saveMedobs(master);
         }
-        inp.value = '';
         renderMedobsPicker();
+      }
+
+      const medobsNewName = document.getElementById('medobs-new-name');
+      document.getElementById('medobs-new-add-btn').addEventListener('click', () => {
+        addCoObserver(medobsNewName.value);
+        medobsNewName.value = '';
       });
+
+      // Autocomplete mot AO sitt observatørregister — nyttig når personen ikke
+      // står i medobs-lista fra før (samme AO-endepunkt som medobs.html/index.html).
+      let acDebounce = null;
+      let acActiveIndex = -1;
+
+      function getAoTokens() {
+        try { return JSON.parse(localStorage.getItem('ao_tokens') || '{}'); }
+        catch { return {}; }
+      }
+
+      async function searchObservers(query) {
+        const tokens = getAoTokens();
+        if (!tokens.loginToken || !tokens.authCookie) return [];
+        try {
+          const resp = await fetch('/api/ao-search-observers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ search: query, loginToken: tokens.loginToken, authCookie: tokens.authCookie }),
+          });
+          if (!resp.ok) return [];
+          return await resp.json();
+        } catch { return []; }
+      }
+
+      function setupNewNameAutocomplete(inp) {
+        const parent = inp.parentElement;
+        const wrap = document.createElement('div');
+        wrap.className = 'medobs-ac-wrap';
+        parent.insertBefore(wrap, inp);
+        wrap.appendChild(inp);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'medobs-ac-list';
+        wrap.appendChild(dropdown);
+
+        function hideDropdown() {
+          dropdown.classList.remove('show');
+          dropdown.innerHTML = '';
+          acActiveIndex = -1;
+        }
+
+        function selectItem(name) {
+          addCoObserver(name);
+          inp.value = '';
+          hideDropdown();
+        }
+
+        inp.addEventListener('input', () => {
+          const query = inp.value.trim();
+          if (query.length < 3) { hideDropdown(); return; }
+
+          clearTimeout(acDebounce);
+          acDebounce = setTimeout(async () => {
+            dropdown.innerHTML = '<div class="medobs-ac-spinner">Søker…</div>';
+            dropdown.classList.add('show');
+            acActiveIndex = -1;
+
+            const results = await searchObservers(query);
+            dropdown.innerHTML = '';
+            if (results.length === 0) {
+              dropdown.innerHTML = '<div class="medobs-ac-spinner">Ingen treff</div>';
+              return;
+            }
+            results.sort((a, b) => (b.isCoObserver ? 1 : 0) - (a.isCoObserver ? 1 : 0));
+            results.forEach((user) => {
+              const item = document.createElement('div');
+              item.className = 'medobs-ac-item';
+              let html = '';
+              if (user.isCoObserver) html += '<span class="ac-fav">★</span>';
+              html += escapeHtml(user.name);
+              if (user.city) html += `<span class="ac-city">${escapeHtml(user.city)}</span>`;
+              item.innerHTML = html;
+              item.addEventListener('mousedown', (e) => { e.preventDefault(); selectItem(user.name); });
+              dropdown.appendChild(item);
+            });
+          }, 400);
+        });
+
+        inp.addEventListener('keydown', (e) => {
+          const items = dropdown.querySelectorAll('.medobs-ac-item');
+          if (e.key === 'Enter' && acActiveIndex < 0) {
+            // Ingen treff valgt — legg til det som står i feltet direkte
+            e.preventDefault();
+            addCoObserver(inp.value);
+            inp.value = '';
+            hideDropdown();
+            return;
+          }
+          if (!items.length) return;
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            acActiveIndex = Math.min(acActiveIndex + 1, items.length - 1);
+            items.forEach((it, i) => it.classList.toggle('active', i === acActiveIndex));
+            items[acActiveIndex]?.scrollIntoView({ block: 'nearest' });
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            acActiveIndex = Math.max(acActiveIndex - 1, 0);
+            items.forEach((it, i) => it.classList.toggle('active', i === acActiveIndex));
+            items[acActiveIndex]?.scrollIntoView({ block: 'nearest' });
+          } else if (e.key === 'Enter' && acActiveIndex >= 0) {
+            e.preventDefault();
+            const el = items[acActiveIndex].cloneNode(true);
+            el.querySelector('.ac-city')?.remove();
+            el.querySelector('.ac-fav')?.remove();
+            selectItem(el.textContent.trim());
+          } else if (e.key === 'Escape') {
+            hideDropdown();
+          }
+        });
+
+        inp.addEventListener('blur', () => { setTimeout(hideDropdown, 200); });
+      }
+
+      setupNewNameAutocomplete(medobsNewName);
 
       if (!obs) {
         // Hvis ingen gyldig observasjon, vis tomt skjema og gi beskjed
