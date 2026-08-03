@@ -12,7 +12,8 @@
       input, select { width:100%; padding:8px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.15); background:rgba(255,255,255,0.02); color:var(--text); }
       .row { display:flex; gap:8px; }
       .btn { padding:8px 12px; border-radius:8px; border:1px solid rgba(148,163,184,0.15); background: #3b82f6; color:white; cursor:pointer; }
-      .btn-ghost { background:transparent; border:1px solid rgba(148,163,184,0.12); color:var(--text); }
+      .btn-ghost { padding:8px 12px; border-radius:8px; cursor:pointer; background:transparent; border:1px solid rgba(148,163,184,0.12); color:var(--text); }
+      .skjult { display:none !important; }
       body.theme-light {
         background: #ffffff !important; color: #1a1a1a !important;
       }
@@ -92,7 +93,26 @@
         <label>Skjul funn til dato
           <input id="f-hide-until" name="hideUntil" type="date" />
         </label>
-        <div id="medobs-readonly" style="margin-top:8px;color:var(--muted)"></div>
+        <label>Bilde</label>
+        <input id="f-photo" type="file" accept="image/*" capture="environment" hidden />
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="photo-pick-btn" class="btn-ghost" style="flex:1;">📁 Velg bilde</button>
+          <button type="button" id="photo-paste-btn" class="btn-ghost skjult" style="flex:1;">📋 Lim inn</button>
+        </div>
+        <div id="photo-preview-wrap" style="display:none;margin-top:8px;">
+          <img id="photo-preview" style="max-width:100%;border-radius:8px;display:block;" alt="Valgt bilde" />
+          <button type="button" id="photo-remove-btn" class="btn-ghost" style="margin-top:6px;">Fjern bilde</button>
+        </div>
+        <div style="font-size:0.85em;color:var(--muted,#9ca3af);margin-top:2px;">
+          Bildet lastes opp til Artsobservasjoner når observasjonen er sendt og har fått
+          en observasjons-ID der — ikke før.
+        </div>
+        <label style="margin-top:8px;">Medobservatører</label>
+        <div id="medobs-picker" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input id="medobs-new-name" type="text" placeholder="Legg til navn…" autocomplete="off" style="flex:1;" />
+          <button type="button" id="medobs-new-add-btn" class="btn-ghost" style="flex-shrink:0;">Legg til</button>
+        </div>
         <div style="margin-top:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end;">
           <button type="button" id="cancel-btn" class="btn-ghost">Avbryt</button>
           <button type="submit" class="btn">Lagre</button>
@@ -100,7 +120,9 @@
       </form>
     </div>
 
-    <script>
+    <script type="module">
+      import { loadMedobs, saveMedobs } from './js/storage.js';
+
       const STORAGE_KEY = 'fugleobservasjoner_v1';
       function getObservations() {
         try {
@@ -137,6 +159,108 @@
       const fTimeFrom = document.getElementById('f-time-from');
       const fTimeTo = document.getElementById('f-time-to');
       const fHideUntil = document.getElementById('f-hide-until');
+      const fPhoto = document.getElementById('f-photo');
+      const photoPickBtn = document.getElementById('photo-pick-btn');
+      const photoPreviewWrap = document.getElementById('photo-preview-wrap');
+      const photoPreview = document.getElementById('photo-preview');
+      const photoRemoveBtn = document.getElementById('photo-remove-btn');
+
+      // null = urørt (behold det obs allerede har, om noe). '' = eksplisitt fjernet.
+      // Ellers: valgt/eksisterende bilde som data-URL.
+      let photoDataUrl = null;
+
+      function showPhotoPreview(dataUrl) {
+        photoDataUrl = dataUrl;
+        photoPreview.src = dataUrl;
+        photoPreviewWrap.style.display = 'block';
+      }
+      function clearPhoto() {
+        photoDataUrl = '';
+        photoPreview.src = '';
+        photoPreviewWrap.style.display = 'none';
+        fPhoto.value = '';
+      }
+
+      // Skalerer ned til maks 1600px langside (samme grense AO selv bruker server-side)
+      // og komprimerer til JPEG — mobilkamera leverer ofte langt større bilder enn
+      // nødvendig for et artsfunn, og base64 i JSON øker størrelsen med ~33 %.
+      function downscaleImage(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              const maxSide = 1600;
+              let { width, height } = img;
+              if (width > maxSide || height > maxSide) {
+                if (width > height) { height = Math.round(height * maxSide / width); width = maxSide; }
+                else { width = Math.round(width * maxSide / height); height = maxSide; }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.85));
+            };
+            img.onerror = () => reject(new Error('Kunne ikke lese bildet'));
+            img.src = reader.result;
+          };
+          reader.onerror = () => reject(new Error('Kunne ikke lese filen'));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function handlePickedFile(file) {
+        if (!file) return;
+        try {
+          const dataUrl = await downscaleImage(file);
+          showPhotoPreview(dataUrl);
+        } catch (e) {
+          console.warn('Kunne ikke lese bildet', e);
+          alert('Kunne ikke lese bildet — prøv et annet.');
+        }
+      }
+
+      photoPickBtn.addEventListener('click', () => fPhoto.click());
+      fPhoto.addEventListener('change', () => {
+        handlePickedFile(fPhoto.files && fPhoto.files[0]);
+      });
+
+      photoRemoveBtn.addEventListener('click', clearPhoto);
+
+      // Lim inn med tastatur (Ctrl/Cmd+V) — samme mønster som orakel-prosjektet.
+      // Kun ett bilde her (i motsetning til orakels galleri), så vi tar det første.
+      document.addEventListener('paste', (e) => {
+        const fil = [...(e.clipboardData && e.clipboardData.items || [])]
+          .filter((i) => i.kind === 'file' && i.type.startsWith('image/'))
+          .map((i) => i.getAsFile())
+          .find(Boolean);
+        if (fil) {
+          e.preventDefault();
+          handlePickedFile(fil);
+        }
+      });
+
+      // Lim inn med knapp — mobil har ingen Ctrl+V. Vises bare der API-et finnes.
+      const photoPasteBtn = document.getElementById('photo-paste-btn');
+      if (navigator.clipboard && navigator.clipboard.read) {
+        photoPasteBtn.classList.remove('skjult');
+        photoPasteBtn.addEventListener('click', async () => {
+          try {
+            for (const element of await navigator.clipboard.read()) {
+              const type = element.types.find((t) => t.startsWith('image/'));
+              if (!type) continue;
+              const blob = await element.getType(type);
+              await handlePickedFile(new File([blob], 'limt-inn', { type: blob.type }));
+              return;
+            }
+            alert('Fant ikke noe bilde på utklippstavla.');
+          } catch (e) {
+            console.warn('Fikk ikke lese utklippstavla', e);
+            alert('Fikk ikke lese utklippstavla — velg bildet fra fil i stedet.');
+          }
+        });
+      }
 
       // Hjelpefunksjon for å hente YYYY-MM-DD fra ISO-streng
       function isoToDate(isoStr) {
@@ -193,6 +317,63 @@
         return toLocalIso(d);
       }
 
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+      }
+
+      const MEDOBS_MAX = 10;
+      const selectedCoObservers = new Set();
+
+      function renderMedobsPicker() {
+        const container = document.getElementById('medobs-picker');
+        const master = loadMedobs().map((it) => it.name).filter(Boolean);
+        // Ta med navn valgt på denne observasjonen selv om de ikke lenger står i medobs-lista
+        const allNames = Array.from(new Set([...master, ...selectedCoObservers]));
+        container.innerHTML = '';
+        if (allNames.length === 0) {
+          container.innerHTML = '<div style="color:var(--muted);font-size:0.9em;">Ingen medobservatører lagt til ennå — legg til under.</div>';
+          return;
+        }
+        allNames.forEach((name) => {
+          const label = document.createElement('label');
+          label.style.cssText = 'display:flex;align-items:center;gap:8px;font-weight:normal;margin:0;color:var(--text);';
+          label.innerHTML = `<input type="checkbox" style="width:18px;height:18px;" ${selectedCoObservers.has(name) ? 'checked' : ''} /> <span>${escapeHtml(name)}</span>`;
+          const cb = label.querySelector('input');
+          cb.addEventListener('change', () => {
+            if (cb.checked) {
+              if (selectedCoObservers.size >= MEDOBS_MAX) {
+                cb.checked = false;
+                alert(`Maks ${MEDOBS_MAX} medobservatører per observasjon.`);
+                return;
+              }
+              selectedCoObservers.add(name);
+            } else {
+              selectedCoObservers.delete(name);
+            }
+          });
+          container.appendChild(label);
+        });
+      }
+
+      document.getElementById('medobs-new-add-btn').addEventListener('click', () => {
+        const inp = document.getElementById('medobs-new-name');
+        const name = inp.value.trim();
+        if (!name) return;
+        if (!selectedCoObservers.has(name) && selectedCoObservers.size >= MEDOBS_MAX) {
+          alert(`Maks ${MEDOBS_MAX} medobservatører per observasjon.`);
+          return;
+        }
+        selectedCoObservers.add(name);
+        // Legg navnet til i medobs-lista også, slik at det ligger klart neste gang
+        const master = loadMedobs();
+        if (!master.some((it) => it.name === name)) {
+          master.push({ name, active: false });
+          saveMedobs(master);
+        }
+        inp.value = '';
+        renderMedobsPicker();
+      });
+
       if (!obs) {
         // Hvis ingen gyldig observasjon, vis tomt skjema og gi beskjed
         document.querySelector('.card').insertAdjacentHTML('beforeend', '<div style="color:var(--muted);margin-top:12px;">Fant ikke observasjon med denne id-en.</div>');
@@ -212,16 +393,13 @@
         document.getElementById('f-comment').value = obs.comment || '';
         // Skjul funn til dato
         fHideUntil.value = obs.hideUntil || '';
-        // Vis medobservatører (readonly)
-        const mDiv = document.getElementById('medobs-readonly');
-        if (mDiv) {
-          const list = (obs.coObservers || []).filter(Boolean);
-          if (list.length) {
-            mDiv.textContent = 'Medobservatører: ' + list.join(', ');
-          } else {
-            mDiv.textContent = 'Medobservatører: (ingen)';
-          }
+        // Bilde (om observasjonen allerede har ett)
+        if (obs.photo) {
+          showPhotoPreview(obs.photo);
         }
+        // Fyll medobservatør-utvalg
+        (obs.coObservers || []).filter(Boolean).forEach((n) => selectedCoObservers.add(n));
+        renderMedobsPicker();
       }
 
       document.getElementById('cancel-btn').addEventListener('click', () => {
@@ -304,6 +482,13 @@
         } else {
           delete obs.hideUntil;
         }
+        // Bilde: null = urørt, '' = eksplisitt fjernet, ellers ny/eksisterende data-URL
+        if (photoDataUrl) {
+          obs.photo = photoDataUrl;
+        } else if (photoDataUrl === '') {
+          delete obs.photo;
+        }
+        obs.coObservers = Array.from(selectedCoObservers);
         // Oppdater lagring
         observations[idx] = obs;
         saveObservations(observations);
