@@ -20,11 +20,14 @@ sys.path.insert(0, REPO_ROOT)
 
 from src.ao_import import observations_to_csv
 from src.ao_import_httpx import (
+    _decode_data_url,
+    _upload_pending_images,
     fetch_csrf_tokens,
     number_of_sightings_importing,
     number_of_sightings_submitted,
     post_with_curl,
     publish_all,
+    upload_image,
 )
 from server import Handler
 
@@ -216,6 +219,38 @@ def test_observations_to_csv_time_omitted_when_midnight():
     # Fra klokkeslett (kolonne 8), Til klokkeslett (kolonne 9)
     assert fields[8] == ''
     assert fields[9] == ''
+
+
+def test_observations_to_csv_photo_marker_in_private_comment():
+    """_photoMarker skal havne i «Privat kommentar»-kolonnen, ikke den offentlige."""
+    observations = [{
+        'species': {'taxonName': 'Låvesvale'},
+        'timestamp': '2024-06-01T08:00:00Z',
+        'placeName': 'Nes',
+        'count': '1',
+        'comment': 'Offentlig kommentar',
+        '_photoMarker': '#pic-abc12345',
+    }]
+
+    csv = observations_to_csv(observations)
+    fields = csv.split('\r\n')[1].split('\t')
+
+    assert fields[14] == 'Offentlig kommentar'  # Kommentar (synlig for alle)
+    assert fields[15] == '#pic-abc12345'  # Privat kommentar
+
+
+def test_observations_to_csv_no_marker_when_no_photo():
+    """Uten _photoMarker skal privat kommentar fortsatt være tom (uendret oppførsel)."""
+    observations = [{
+        'species': {'taxonName': 'Låvesvale'},
+        'timestamp': '2024-06-01T08:00:00Z',
+        'placeName': 'Nes',
+        'count': '1',
+    }]
+
+    csv = observations_to_csv(observations)
+    fields = csv.split('\r\n')[1].split('\t')
+    assert fields[15] == ''
 
 
 # ============================================================================
@@ -413,6 +448,155 @@ def test_post_with_curl_no_held_back_when_queue_empty(monkeypatch):
 
     assert result['success'] is True
     assert 'heldBack' not in result
+
+
+def test_post_with_curl_uploads_photo_via_marker_matching(monkeypatch):
+    """Observasjon med bilde skal matches mot riktig SightingId via markøren i privat
+    kommentar (review_queue_rows) og lastes opp før publisering."""
+    monkeypatch.setattr('src.ao_import_httpx.fetch_csrf_tokens',
+                        lambda lt, ac: ('FORM123', 'COOKIE456', None))
+
+    mock_response = Mock()
+    mock_response.text = '<html></html>'
+    mock_response.status_code = 200
+    mock_client = Mock()
+    mock_client.__enter__ = Mock(return_value=mock_client)
+    mock_client.__exit__ = Mock(return_value=None)
+    mock_client.post = Mock(return_value=mock_response)
+    monkeypatch.setattr('httpx.Client', lambda: mock_client)
+    monkeypatch.setattr('time.sleep', lambda x: None)
+    monkeypatch.setattr('src.ao_import_httpx.publish_all', lambda lt, ac: {'status': 200})
+
+    observations = [{
+        'species': {'taxonName': 'Fiskemåke'}, 'count': '1',
+        'timestamp': '2024-01-15T14:00:00Z', 'placeName': 'Oslo',
+        'photo': 'data:image/jpeg;base64,QUJD',  # b'ABC'
+    }]
+
+    # review_queue_rows leser _photoMarker fra observasjonen direkte — den settes av
+    # post_with_curl selv (secrets.token_hex), så vi kan ikke forhåndskjenne verdien.
+    def fake_review_rows(login_token, auth_cookie, size=200):
+        return [{'SightingId': 999888, 'PrivateCommentLong': observations[0].get('_photoMarker', '')}]
+
+    upload_calls = []
+
+    def fake_upload_image(sighting_id, image_bytes, filename, login_token, auth_cookie, media_license='10'):
+        upload_calls.append((sighting_id, image_bytes))
+        return {'id': 123}
+
+    monkeypatch.setattr('src.ao_import_httpx.review_queue_rows', fake_review_rows)
+    monkeypatch.setattr('src.ao_import_httpx.upload_image', fake_upload_image)
+
+    result = post_with_curl(observations, 'LOGIN123', 'AUTH456')
+
+    assert result['success'] is True
+    assert 'imagesFailed' not in result
+    assert len(upload_calls) == 1
+    assert upload_calls[0][0] == 999888
+    assert upload_calls[0][1] == b'ABC'
+    assert observations[0]['_photoMarker'].startswith('#pic-')
+
+
+def test_post_with_curl_reports_failed_image_without_blocking_publish(monkeypatch):
+    """Et bilde som ikke lar seg matche skal aldri hindre selve publiseringen."""
+    monkeypatch.setattr('src.ao_import_httpx.fetch_csrf_tokens',
+                        lambda lt, ac: ('FORM123', 'COOKIE456', None))
+
+    mock_response = Mock()
+    mock_response.text = '<html></html>'
+    mock_response.status_code = 200
+    mock_client = Mock()
+    mock_client.__enter__ = Mock(return_value=mock_client)
+    mock_client.__exit__ = Mock(return_value=None)
+    mock_client.post = Mock(return_value=mock_response)
+    monkeypatch.setattr('httpx.Client', lambda: mock_client)
+    monkeypatch.setattr('time.sleep', lambda x: None)
+    monkeypatch.setattr('src.ao_import_httpx.publish_all', lambda lt, ac: {'status': 200})
+    # Tom gjennomgangskø → ingen rad matcher markøren
+    monkeypatch.setattr('src.ao_import_httpx.review_queue_rows', lambda lt, ac, size=200: [])
+
+    observations = [{
+        'species': {'taxonName': 'Tårnseiler'}, 'count': '1',
+        'timestamp': '2024-01-15T14:00:00Z', 'placeName': 'Oslo',
+        'photo': 'data:image/jpeg;base64,QUJD',
+    }]
+
+    result = post_with_curl(observations, 'LOGIN123', 'AUTH456')
+
+    assert result['success'] is True
+    assert result['imagesFailed'] == ['Tårnseiler']
+
+
+def test_upload_pending_images_no_photos_is_noop(monkeypatch):
+    """Uten vedlagte bilder skal ingen nettverkskall til review_queue_rows/upload_image gjøres."""
+    called = []
+    monkeypatch.setattr('src.ao_import_httpx.review_queue_rows',
+                        lambda *a, **kw: called.append('review') or [])
+    observations = [{'species': {'taxonName': 'Gråspurv'}, 'count': '1'}]
+    failed = _upload_pending_images(observations, 'LOGIN', 'AUTH')
+    assert failed == []
+    assert called == []
+
+
+def test_decode_data_url():
+    assert _decode_data_url('data:image/jpeg;base64,QUJD') == b'ABC'
+    with pytest.raises(ValueError):
+        _decode_data_url('ikke-en-data-url')
+
+
+def test_upload_image_handles_non_json_response(monkeypatch):
+    """
+    Bekreftet i praksis 03.08.2026: AOs opplastingsrespons er ikke alltid ren JSON — den
+    kom pakket inn i HTML selv om bildet ble korrekt lastet opp (HTTP 200). `response.json()`
+    feilet da med "Expecting value: line 1 column 1 (char 0)" og fikk et vellykket opplastet
+    bilde til å rapporteres som mislykket. Skal nå hverken krasje eller feilrapportere.
+    """
+    get_response = Mock()
+    get_response.text = '<html><input name="__RequestVerificationToken" value="FORMTOK"/></html>'
+    get_response.status_code = 200
+    get_response.raise_for_status = Mock()
+    get_response.cookies = {'__RequestVerificationToken': 'COOKIETOK'}
+
+    post_response = Mock()
+    post_response.status_code = 200
+    post_response.text = '<textarea>{"id": 42, "SightingId": 999}</textarea>'
+    post_response.json = Mock(side_effect=ValueError('Expecting value: line 1 column 1 (char 0)'))
+
+    mock_client = Mock()
+    mock_client.__enter__ = Mock(return_value=mock_client)
+    mock_client.__exit__ = Mock(return_value=None)
+    mock_client.get = Mock(return_value=get_response)
+    mock_client.post = Mock(return_value=post_response)
+    monkeypatch.setattr('httpx.Client', lambda: mock_client)
+
+    result = upload_image(999, b'ABC', 'bilde.jpg', 'LOGIN', 'AUTH')
+
+    assert result == {'id': 42, 'SightingId': 999}
+
+
+def test_upload_image_non_json_without_embedded_json_returns_empty_dict(monkeypatch):
+    """Ingen JSON å finne i det hele tatt → tomt resultat, ikke unntak (status < 400 holder)."""
+    get_response = Mock()
+    get_response.text = '<html><input name="__RequestVerificationToken" value="FORMTOK"/></html>'
+    get_response.status_code = 200
+    get_response.raise_for_status = Mock()
+    get_response.cookies = {'__RequestVerificationToken': 'COOKIETOK'}
+
+    post_response = Mock()
+    post_response.status_code = 200
+    post_response.text = '<html>OK</html>'
+    post_response.json = Mock(side_effect=ValueError('Expecting value'))
+
+    mock_client = Mock()
+    mock_client.__enter__ = Mock(return_value=mock_client)
+    mock_client.__exit__ = Mock(return_value=None)
+    mock_client.get = Mock(return_value=get_response)
+    mock_client.post = Mock(return_value=post_response)
+    monkeypatch.setattr('httpx.Client', lambda: mock_client)
+
+    result = upload_image(999, b'ABC', 'bilde.jpg', 'LOGIN', 'AUTH')
+
+    assert result == {}
 
 
 # ============================================================================

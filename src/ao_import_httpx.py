@@ -2,9 +2,12 @@
 AO Direct Import - Bruker httpx for HTTP-kall.
 """
 
+import base64
+import json
 import logging
 import os
 import re
+import secrets
 import time
 from urllib.parse import quote_plus
 
@@ -205,6 +208,156 @@ def _describe_held_back(login_token, auth_cookie, limit=3):
     return ', '.join(biter)
 
 
+def _decode_data_url(data_url):
+    """Del opp en data:-URL (data:image/jpeg;base64,....) og returner rå bytes."""
+    if not data_url or ',' not in data_url:
+        raise ValueError('Ugyldig bildedata')
+    _, b64 = data_url.split(',', 1)
+    return base64.b64decode(b64)
+
+
+def _obs_label(obs):
+    """Kort, menneskelig beskrivelse av en observasjon — til feilmeldinger."""
+    species = obs.get('species', '')
+    navn = species.get('taxonName', '') if isinstance(species, dict) else str(species or '')
+    return (navn or 'ukjent art').strip()
+
+
+def _fetch_review_csrf(login_token, auth_cookie):
+    """
+    Hent CSRF-token fra /ReviewSighting (samme mønster som `publish_all`).
+
+    Brukes til bildeopplasting, som skjer FØR publisering mens funnet fortsatt ligger i
+    gjennomgangskøen.
+    """
+    cookies = {
+        'logintoken': login_token,
+        '.ASPXAUTHNO': auth_cookie,
+        'AcceptCookies': '1'
+    }
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0'
+    }
+    with httpx.Client() as client:
+        response = client.get(
+            'https://www.artsobservasjoner.no/ReviewSighting',
+            cookies=cookies, headers=headers, timeout=15, follow_redirects=True,
+        )
+        response.raise_for_status()
+
+    html = response.text
+    match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', html)
+    if not match:
+        raise ValueError('Kunne ikke finne form CSRF token for bildeopplasting')
+    form_token = match.group(1)
+
+    cookie_token = response.cookies.get('__RequestVerificationToken')
+    if not cookie_token:
+        raise ValueError('Kunne ikke finne cookie CSRF token for bildeopplasting')
+
+    return form_token, cookie_token
+
+
+def upload_image(sighting_id, image_bytes, filename, login_token, auth_cookie, media_license='10'):
+    """
+    Last opp ett bilde til en observasjon i gjennomgangskøen.
+
+    Krever en ekte `SightingId` — funnet må ha blitt ferdig parset av AO og ligge i
+    gjennomgangskøen (se `PossibleToUploadImages` i `review_queue_rows()`,
+    `docs/ao-bilder-api.md`). `media_license` er AOs lisensvalg for bildet:
+    10=CC BY (default), 20=CC BY-SA, 30=CC BY-NC-SA, 60=Ingen (alle rettigheter forbeholdt).
+    """
+    form_token, cookie_token = _fetch_review_csrf(login_token, auth_cookie)
+
+    cookies = {
+        'AcceptCookies': '1',
+        'logintoken': login_token,
+        '.ASPXAUTHNO': auth_cookie,
+        '__RequestVerificationToken': cookie_token,
+    }
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0',
+        'Referer': 'https://www.artsobservasjoner.no/ReviewSighting',
+    }
+    data = {
+        '__RequestVerificationToken': form_token,
+        'UploadImageViewModel.Sighting.Id': str(sighting_id),
+        'UploadImageViewModel.MediaLicense': str(media_license),
+    }
+    files = {
+        'UploadImageViewModel.Image': (filename, image_bytes, 'image/jpeg'),
+    }
+
+    with httpx.Client() as client:
+        response = client.post(
+            'https://www.artsobservasjoner.no/Media/UploadImageAction',
+            data=data, files=files, cookies=cookies, headers=headers, timeout=30,
+        )
+
+    if response.status_code >= 400:
+        raise ValueError(f'Bildeopplasting feilet: HTTP {response.status_code}')
+
+    # HTTP < 400 er selve beviset på at AO tok imot bildet — se docs/ao-bilder-api.md.
+    # Responsen er ikke nødvendigvis ren JSON: AOs eget UI bruker en iframe-postback, og
+    # slike endepunkter pakker ofte JSON-en inn i HTML (f.eks. <textarea>...</textarea>)
+    # for å unngå at nettleseren prøver å laste den ned som fil. Bekreftet i praksis
+    # 03.08.2026 — `response.json()` feilet med "Expecting value: line 1 column 1" selv
+    # om bildet var korrekt lastet opp og synlig på AO.
+    try:
+        return response.json()
+    except ValueError:
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except ValueError:
+                pass
+        logger.debug(f'[AO-HTTPX] Opplastingsrespons var ikke JSON, ignorerer: {response.text[:200]!r}')
+        return {}
+
+
+def _upload_pending_images(observations, login_token, auth_cookie, progress_cb=None):
+    """
+    Match observasjoner med vedlagt bilde mot ekte SightingId (via markøren i privat
+    kommentar) og last dem opp — best-effort, aldri blokkerende for selve publiseringen.
+
+    Returnerer liste av artsnavn det IKKE lot seg gjøre å laste opp bilde for (tom liste
+    hvis alt gikk bra, eller ingen bilder var vedlagt).
+    """
+    photo_obs = [o for o in observations if o.get('photo') and o.get('_photoMarker')]
+    if not photo_obs:
+        return []
+
+    total = len(photo_obs)
+    if progress_cb:
+        progress_cb({'phase': 'uploading-images', 'done': 0, 'total': total})
+
+    rows = review_queue_rows(login_token, auth_cookie)
+    rows_by_marker = {}
+    for row in (rows or []):
+        marker = (row.get('PrivateCommentLong') or '').strip()
+        if marker:
+            rows_by_marker[marker] = row
+
+    failed = []
+    for i, obs in enumerate(photo_obs):
+        row = rows_by_marker.get(obs['_photoMarker'])
+        if not row:
+            logger.warning(f'[AO-HTTPX] Fant ikke gjennomgangsrad for bilde ({_obs_label(obs)}) — hopper over')
+            failed.append(_obs_label(obs))
+        else:
+            try:
+                image_bytes = _decode_data_url(obs['photo'])
+                upload_image(row.get('SightingId'), image_bytes, 'bilde.jpg', login_token, auth_cookie)
+            except Exception as e:
+                logger.warning(f'[AO-HTTPX] Bildeopplasting feilet for {_obs_label(obs)}: {e}')
+                failed.append(_obs_label(obs))
+        if progress_cb:
+            progress_cb({'phase': 'uploading-images', 'done': i + 1, 'total': total})
+
+    return failed
+
+
 def _remaining_after_publish(login_token, auth_cookie, timeout=6.0, interval=1.0):
     """
     Antall observasjoner som fortsatt ligger i gjennomgangskøen etter publisering.
@@ -275,6 +428,13 @@ def post_with_curl(observations, login_token=None, auth_cookie=None, area_id='',
     # Hent BEGGE CSRF tokens + eventuell fornyet auth cookie
     form_token, cookie_token, refreshed_auth = fetch_csrf_tokens(login_token, auth_cookie)
 
+    # Observasjoner med vedlagt bilde får en unik markør i privat kommentar (kun synlig
+    # for reporter selv på AO), slik at vi etterpå kan koble raden i gjennomgangskøen
+    # til riktig lokal observasjon — se `_upload_pending_images` og `docs/bilde-opplasting-plan.md`.
+    for obs in observations:
+        if obs.get('photo'):
+            obs['_photoMarker'] = f'#pic-{secrets.token_hex(4)}'
+
     csv_data = observations_to_csv(observations)
     logger.debug(f'[AO-HTTPX] CSV length: {len(csv_data)}')
 
@@ -342,6 +502,12 @@ def post_with_curl(observations, login_token=None, auth_cookie=None, area_id='',
     if progress_cb:
         progress_cb({'phase': 'importing', 'remaining': total, 'total': total})
     _poll_importing_done(login_token, auth_cookie, total, progress_cb)
+
+    # Steg 2b: last opp vedlagte bilder mens funnene ligger i gjennomgangskøen — det er
+    # eneste vinduet AO tillater det (PossibleToUploadImages, docs/ao-bilder-api.md).
+    # Best-effort: et bilde som feiler stopper aldri selve publiseringen.
+    images_failed = _upload_pending_images(observations, login_token, auth_cookie, progress_cb)
+
     if progress_cb:
         progress_cb({'phase': 'publishing', 'total': total})
 
@@ -394,6 +560,8 @@ def post_with_curl(observations, login_token=None, auth_cookie=None, area_id='',
         'published': True,
         'refreshedAuthCookie': refreshed_auth
     }
+    if images_failed:
+        result['imagesFailed'] = images_failed
     if held_back:
         detaljer = _describe_held_back(login_token, auth_cookie)
         logger.warning(f'[AO-HTTPX] {held_back} observasjon(er) ble ikke publisert: {detaljer or "ukjent årsak"}')

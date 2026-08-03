@@ -252,6 +252,11 @@ export async function handleDirectSend(observations, dom, callbacks) {
           const behandlet = Math.max(0, t - (evt.remaining || 0));
           const pct = t ? Math.round((behandlet / t) * 100) : null;
           _renderProgress(dom, 2, 3, `Behandler ${behandlet} av ${t} …`, pct);
+        } else if (evt.phase === 'uploading-images') {
+          const t = evt.total || 0;
+          const d = evt.done || 0;
+          const pct = t ? Math.round((d / t) * 100) : null;
+          _renderProgress(dom, 2, 3, `Laster opp bilder (${d}/${t}) …`, pct);
         } else if (evt.phase === 'publishing') {
           const t = evt.total || total;
           _renderProgress(dom, 3, 3, `Publiserer ${t} observasjon${t !== 1 ? 'er' : ''} …`, null);
@@ -284,7 +289,11 @@ export async function handleDirectSend(observations, dom, callbacks) {
     }
 
     dom.aoDirectStatus.style.cssText = `display:block;margin-top:8px;padding:10px;border-radius:8px;font-size:0.9rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:${_statusColor('success')};`;
-    dom.aoDirectStatus.textContent = `✅ ${importResult.count} observasjon${importResult.count !== 1 ? 'er' : ''} sendt til AO!`;
+    let statusText = `✅ ${importResult.count} observasjon${importResult.count !== 1 ? 'er' : ''} sendt til AO!`;
+    if (importResult.imagesFailed && importResult.imagesFailed.length) {
+      statusText += ` ⚠️ Bilde ikke lastet opp for: ${importResult.imagesFailed.join(', ')} — observasjonen er likevel sendt, prøv å laste opp bildet på nytt direkte på AO.`;
+    }
+    dom.aoDirectStatus.textContent = statusText;
     fetch('/api/log-export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'direct' }) }).catch(() => {});
 
     // Merk hva som ble publisert, så et nytt trykk ikke sender dem på nytt, og lista
@@ -292,7 +301,13 @@ export async function handleDirectSend(observations, dom, callbacks) {
     // kvitteringen og merkingen borte i samme øyeblikk brukeren svarer «ja» under.
     const sendtTidspunkt = new Date().toISOString();
     utvalg.forEach((o) => { o.sentTs = sendtTidspunkt; });
-    appendSentBatch(utvalg);
+    // Sendt-loggen dupliserer observasjonene i egen localStorage-nøkkel — ikke ta med
+    // bilde-base64 dit også, det ville doblet lagringsbruken for ingen nytte (bildet er
+    // allerede forsøkt sendt til AO på dette tidspunktet).
+    appendSentBatch(utvalg.map((o) => {
+      const { photo, _photoMarker, ...rest } = o;
+      return photo ? { ...rest, hadPhoto: true } : rest;
+    }));
     callbacks.doRenderObservations();
     callbacks.saveState();
 

@@ -119,7 +119,7 @@ def observations_to_csv(observations):
             obs.get('gender', ''),
             obs.get('activity', ''),
             obs.get('comment', ''),
-            '',  # Privat kommentar
+            obs.get('_photoMarker', ''),  # Privat kommentar (markør for bildematching)
             hide_until_str,
         ]
 
