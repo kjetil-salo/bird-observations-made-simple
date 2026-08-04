@@ -266,19 +266,37 @@
       if (navigator.clipboard && navigator.clipboard.read) {
         photoPasteBtn.classList.remove('skjult');
         photoPasteBtn.addEventListener('click', async () => {
+          // Tre ulike ting kan feile her (Android leverer ofte galleri-bilder som
+          // en URI/annet format enn image/*, ikke bare en ren tilgangsnekt) — skill
+          // dem fra hverandre i loggen så vi vet HVA som feilet neste gang noen rapporterer dette.
+          let items;
           try {
-            for (const element of await navigator.clipboard.read()) {
-              const type = element.types.find((t) => t.startsWith('image/'));
-              if (!type) continue;
+            items = await navigator.clipboard.read();
+          } catch (e) {
+            console.warn('navigator.clipboard.read() feilet:', e.name, e.message);
+            const arsak = e.name === 'NotAllowedError' ? 'tillatelse nektet' : e.name || 'ukjent feil';
+            alert(`Fikk ikke tilgang til utklippstavla (${arsak}) — velg bildet fra fil i stedet.`);
+            return;
+          }
+
+          for (const element of items) {
+            const type = element.types.find((t) => t.startsWith('image/'));
+            if (!type) {
+              console.warn('Utklippstavle-element uten bilde-type, fant:', element.types);
+              continue;
+            }
+            try {
               const blob = await element.getType(type);
               await handlePickedFile(new File([blob], 'limt-inn', { type: blob.type }));
               return;
+            } catch (e) {
+              console.warn('Fant bilde-type på utklippstavla, men klarte ikke hente den:', type, e.name, e.message);
+              alert(`Fant et bilde på utklippstavla, men klarte ikke hente det (${e.name || 'ukjent feil'}) — velg bildet fra fil i stedet.`);
+              return;
             }
-            alert('Fant ikke noe bilde på utklippstavla.');
-          } catch (e) {
-            console.warn('Fikk ikke lese utklippstavla', e);
-            alert('Fikk ikke lese utklippstavla — velg bildet fra fil i stedet.');
           }
+          console.warn('Utklippstavla hadde ingen elementer med bilde-type');
+          alert('Fant ikke noe bilde på utklippstavla — velg bildet fra fil i stedet.');
         });
       }
 
