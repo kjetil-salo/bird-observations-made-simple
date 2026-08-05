@@ -331,6 +331,7 @@ class Handler(SimpleHTTPRequestHandler):
             result = share_store.create_share(
                 data.get('observations', []),
                 display_name=data.get('displayName', ''),
+                email=data.get('email', ''),
             )
             if not result:
                 self._send_json({'error': 'Ingen observasjoner å dele'}, status=400)

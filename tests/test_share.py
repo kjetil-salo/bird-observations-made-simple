@@ -113,7 +113,22 @@ def test_side_viser_art_antall_og_sted():
 def test_side_uten_navn_faller_tilbake():
     share = share_store.create_share([_obs()])
     html = generate_share_page(share_store.get_share(share['slug']))
-    assert 'En fuglekikker' in html
+    assert 'Observasjonsrapport fra Hylkjesvingen 49' in html
+
+
+def test_side_uten_navn_men_med_epost_bruker_eposten():
+    share = share_store.create_share([_obs()], email='kjetil@example.com')
+    html = generate_share_page(share_store.get_share(share['slug']))
+    assert 'kjetil@example.com' in html
+    assert 'Observasjonsrapport' not in html
+
+
+def test_ikke_epost_forkastes():
+    """AO-brukernavn som ikke ser ut som en e-post skal ikke publiseres."""
+    share = share_store.create_share([_obs()], email='brukernavn123')
+    html = generate_share_page(share_store.get_share(share['slug']))
+    assert 'brukernavn123' not in html
+    assert 'Observasjonsrapport' in html
 
 
 def test_manglende_side_avslorer_ikke_om_slug_finnes():

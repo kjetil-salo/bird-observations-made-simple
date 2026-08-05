@@ -437,7 +437,8 @@ def generate_share_page(share, base_url=''):
     """
     obs_list = share.get('observations') or []
     navn = (share.get('display_name') or '').strip()
-    eier = _html.escape(navn) if navn else 'En fuglekikker'
+    epost = (share.get('email') or '').strip()
+    identitet = navn or epost
 
     datoer = sorted({(o.get('timestamp') or '')[:10] for o in obs_list if o.get('timestamp')})
     dato_tekst = _norsk_dato(datoer[-1] + 'T00:00:00') if datoer else ''
@@ -480,7 +481,12 @@ def generate_share_page(share, base_url=''):
         sted_html = f'<h2>{_html.escape(sted)}</h2>' if vis_sted else ''
         seksjoner.append(f'<section>{sted_html}<ul>{"".join(rader)}</ul></section>')
 
-    tittel = f'{eier} så {arter} art{"er" if arter != 1 else ""}'
+    if identitet:
+        tittel = f'{_html.escape(identitet)} så {arter} art{"er" if arter != 1 else ""}'
+    else:
+        # Ingen navn eller e-post oppgitt — vis en nøytral rapporttittel
+        # i stedet for et anonymt «En fuglekikker».
+        tittel = f'Observasjonsrapport fra {_html.escape(steder[0])}' if steder else 'Observasjonsrapport'
     if dato_tekst:
         tittel += f' – {dato_tekst}'
     beskrivelse = f'{len(obs_list)} observasjon{"er" if len(obs_list) != 1 else ""}'

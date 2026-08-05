@@ -39,6 +39,7 @@ SHARE_TTL_DAYS = 14
 MAX_OBSERVATIONS = 200
 MAX_PAYLOAD_BYTES = 100_000
 MAX_NAME_LEN = 40
+MAX_EMAIL_LEN = 254
 MAX_TEXT_LEN = 500
 
 
@@ -63,6 +64,9 @@ def init_db():
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_shares_expires ON shares(expires_ts)")
+        cols = {r[1] for r in conn.execute('PRAGMA table_info(shares)')}
+        if 'email' not in cols:
+            conn.execute('ALTER TABLE shares ADD COLUMN email TEXT')
         conn.commit()
 
 
@@ -125,13 +129,17 @@ def sanitize_observations(raw) -> list:
     return rene
 
 
-def create_share(observations, display_name: str = '',
+def create_share(observations, display_name: str = '', email: str = '',
                  ttl_days: int = SHARE_TTL_DAYS) -> dict | None:
     """
     Lagre en deling og returner {'slug', 'deleteKey', 'expiresTs'}.
 
     Returnerer None hvis det ikke er noe å dele eller lagringen feiler
     (kaller sørger for grasiøs degradering).
+
+    `email` er en frivillig visnings-fallback (AO-innloggingen er ofte en
+    e-post) — brukes av generate_share_page kun når display_name er tom.
+    Brukeren har fått opplyst at den i så fall vises offentlig på lenken.
     """
     rene = sanitize_observations(observations)
     if not rene:
@@ -143,6 +151,9 @@ def create_share(observations, display_name: str = '',
         return None
 
     display_name = _clean_text(display_name, MAX_NAME_LEN)
+    email = _clean_text(email, MAX_EMAIL_LEN)
+    if '@' not in email:
+        email = ''  # ikke-epost-verdier skal ikke vises offentlig
     delete_key = secrets.token_urlsafe(16)
     now = time.time()
     expires_ts = now + ttl_days * 86400
@@ -155,9 +166,9 @@ def create_share(observations, display_name: str = '',
                     slug = _generate_slug()
                     try:
                         conn.execute(
-                            "INSERT INTO shares (slug, payload, display_name, delete_key, created_ts, expires_ts) "
-                            "VALUES (?,?,?,?,?,?)",
-                            (slug, payload, display_name, delete_key, now, expires_ts)
+                            "INSERT INTO shares (slug, payload, display_name, email, delete_key, created_ts, expires_ts) "
+                            "VALUES (?,?,?,?,?,?,?)",
+                            (slug, payload, display_name, email, delete_key, now, expires_ts)
                         )
                         conn.commit()
                         return {'slug': slug, 'deleteKey': delete_key, 'expiresTs': expires_ts}

@@ -198,13 +198,19 @@ export function openShareDialog(observations) {
     const navn = box.querySelector('#share-name').value.trim();
     localStorage.setItem(NAME_KEY, navn);
 
+    // Uten navn: bruk AO-innloggingen (ofte en e-post) som visnings-fallback
+    // i stedet for et anonymt «En fuglekikker». Kun hvis den ser ut som en
+    // e-post — vi vil ikke publisere et rent AO-brukernavn ved et uhell.
+    const lagretAoBruker = (localStorage.getItem('ao_username') || '').trim();
+    const epost = !navn && lagretAoBruker.includes('@') ? lagretAoBruker : '';
+
     e.target.disabled = true;
     e.target.textContent = 'Lager lenke…';
     try {
       const resp = await fetch('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ observations: valgte, displayName: navn }),
+        body: JSON.stringify({ observations: valgte, displayName: navn, email: epost }),
       });
       const result = await resp.json();
       if (!resp.ok || !result.ok) throw new Error(result.error || 'Kunne ikke lage lenke');
