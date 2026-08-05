@@ -224,6 +224,20 @@
       </div>
 
       <div style="margin-top:24px;padding-top:18px;border-top:1px solid rgba(148,163,184,0.12);">
+        <h3 style="margin:0 0 4px 0;font-size:1em;color:var(--text,#e5e7eb);">Oppdatering</h3>
+        <p style="font-size:0.82em;color:var(--muted,#aaa);margin:0 0 14px 0;">
+          Appen sjekker selv etter ny versjon, men det kan ta litt tid før den slår gjennom –
+          spesielt hvis appen har stått åpen lenge. Trykk her for å tvinge fram nyeste versjon
+          med en gang, i stedet for å lukke og åpne appen på nytt.
+        </p>
+        <button type="button" id="force-update-btn"
+          style="padding:10px 16px;border-radius:8px;border:none;background:#3b82f6;color:white;font-size:0.95em;cursor:pointer;">
+          🔄 Hent nyeste versjon
+        </button>
+        <div id="update-status" style="display:none;margin-top:8px;padding:10px;border-radius:8px;font-size:0.85em;"></div>
+      </div>
+
+      <div style="margin-top:24px;padding-top:18px;border-top:1px solid rgba(148,163,184,0.12);">
         <h3 style="margin:0 0 4px 0;font-size:1em;color:var(--text,#e5e7eb);">Sikkerhetskopi</h3>
         <p style="font-size:0.82em;color:var(--muted,#aaa);margin:0 0 14px 0;">
           Observasjonene dine lagres bare i denne nettleseren. Last ned en sikkerhetskopi (JSON-fil)
@@ -566,6 +580,34 @@
       });
 
       updateClearLoginVisibility();
+
+      // Tving fram ny versjon: fjern service worker + cache, hent siden ferskt fra nett
+      const forceUpdateBtn = document.getElementById('force-update-btn');
+      const updateStatus = document.getElementById('update-status');
+
+      forceUpdateBtn.addEventListener('click', async () => {
+        forceUpdateBtn.disabled = true;
+        forceUpdateBtn.textContent = '⏳ Henter ny versjon...';
+        updateStatus.style.cssText = `display:block;margin-top:8px;padding:10px;border-radius:8px;font-size:0.85em;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:${_sc('info')};`;
+        updateStatus.textContent = '⏳ Rydder mellomlager og henter fersk versjon...';
+
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+          }
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          }
+        } catch (e) {
+          // Fortsett uansett — cache-bustet reload henter fersk versjon selv om oppryddingen delvis feilet
+        }
+
+        const url = new URL(location.href);
+        url.searchParams.set('_fresh', Date.now());
+        location.href = url.toString();
+      });
 
       // Sikkerhetskopi (backup/gjenoppretting av observasjoner)
       const OBS_KEY = 'fugleobservasjoner_v1';
