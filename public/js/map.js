@@ -24,11 +24,29 @@ if (!userPosition || !userPosition.lat || !userPosition.lon) {
 // Initialiser kart sentrert på brukerens posisjon
 const map = L.map('map').setView([userPosition.lat, userPosition.lon], 13);
 
-// Legg til OpenStreetMap tiles
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// Kartlag å velge mellom
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19
-}).addTo(map);
+});
+
+const kartverketTopoLayer = L.tileLayer('https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png', {
+  attribution: '© <a href="https://www.kartverket.no/">Kartverket</a>',
+  maxZoom: 18
+});
+
+const kartverketGrayscaleLayer = L.tileLayer('https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png', {
+  attribution: '© <a href="https://www.kartverket.no/">Kartverket</a>',
+  maxZoom: 18
+});
+
+osmLayer.addTo(map);
+
+L.control.layers({
+  'OpenStreetMap': osmLayer,
+  'Kartverket Topo': kartverketTopoLayer,
+  'Kartverket Gråtone': kartverketGrayscaleLayer
+}, null, { position: 'bottomleft', collapsed: true }).addTo(map);
 
 // Marker for brukerens posisjon
 const userMarker = L.circleMarker([userPosition.lat, userPosition.lon], {
