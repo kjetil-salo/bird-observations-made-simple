@@ -470,11 +470,14 @@ def generate_share_page(share, base_url=''):
             kommentar = o.get('comment')
             kommentar_html = (f'<div class="kommentar">{_html.escape(kommentar)}</div>'
                               if kommentar else '')
+            foto = o.get('photo')
+            foto_html = (f'<img class="foto" src="{_html.escape(foto)}" alt="" loading="lazy" />'
+                         if foto else '')
             rader.append(f"""
           <li>
             <div class="art">{antall_html}{_html.escape(o.get('taxonName', ''))}</div>
             <div class="tid">{_html.escape(_klokke(o))}</div>
-            {detalj_html}{kommentar_html}
+            {detalj_html}{kommentar_html}{foto_html}
           </li>""")
         # Med bare én lokalitet står navnet allerede i ingressen — ikke gjenta det
         vis_sted = sted and len(grupper) > 1
@@ -529,6 +532,7 @@ def generate_share_page(share, base_url=''):
     .tid {{ float: right; color: #94a3b8; font-size: 0.9rem; }}
     .detalj {{ color: #94a3b8; font-size: 0.9rem; }}
     .kommentar {{ color: #cbd5e1; font-size: 0.9rem; font-style: italic; margin-top: 4px; }}
+    .foto {{ display: block; max-width: 100%; border-radius: 8px; margin-top: 8px; clear: both; }}
     footer {{ margin-top: 32px; text-align: center; color: #64748b; font-size: 0.85rem; }}
     footer a {{ color: #93c5fd; }}
     @media (prefers-color-scheme: light) {{

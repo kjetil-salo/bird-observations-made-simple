@@ -163,6 +163,10 @@ class Handler(SimpleHTTPRequestHandler):
             self._handle_share_post()
             return
 
+        if parsed.path == '/api/share-update':
+            self._handle_share_update_post()
+            return
+
         if parsed.path == '/api/share-delete':
             self._handle_share_delete_post()
             return
@@ -348,6 +352,34 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             logger.error(f'[SHARE] Feil ved oppretting: {e}')
             self._send_json({'error': 'Kunne ikke lage deling'}, status=500)
+
+    def _handle_share_update_post(self):
+        """Oppdater innholdet i en eksisterende deling — samme lenke, ferske funn."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+            data = json.loads(body)
+
+            if not _rate_ok(_share_hits, self._client_ip(), SHARE_MAX_PER_WINDOW, SHARE_WINDOW_SEC):
+                self._send_json({'error': 'For mange delinger — prøv igjen om litt.'}, status=429)
+                return
+
+            result = share_store.update_share(
+                data.get('slug', ''),
+                data.get('deleteKey', ''),
+                data.get('observations', []),
+                display_name=data.get('displayName', ''),
+                email=data.get('email', ''),
+            )
+            if not result:
+                self._send_json({'error': 'Fant ikke delingen, eller feil nøkkel'}, status=404)
+                return
+
+            logger.info(f"[SHARE] Oppdatert {result['slug']}")
+            self._send_json({'ok': True, 'slug': result['slug'], 'expiresTs': result['expiresTs']})
+        except Exception as e:
+            logger.error(f'[SHARE] Feil ved oppdatering: {e}')
+            self._send_json({'error': 'Kunne ikke oppdatere deling'}, status=500)
 
     def _handle_share_delete_post(self):
         """Trekk tilbake en deling. Krever nøkkelen som ble utstedt ved oppretting."""

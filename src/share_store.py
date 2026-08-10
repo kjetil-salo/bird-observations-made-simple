@@ -42,6 +42,14 @@ MAX_NAME_LEN = 40
 MAX_EMAIL_LEN = 254
 MAX_TEXT_LEN = 500
 
+# Bilder har et eget budsjett, atskilt fra tekstbudsjettet over — et par
+# bilder skal aldri kunne felle hele delingen. Klienten nedskalerer alltid
+# til en liten delings-thumbnail (~800px/JPEG q0.6) før innsending; grensene
+# her er en server-side bakstopper, ikke den primære størrelsesstyringen.
+MAX_PHOTO_BYTES = 120_000
+MAX_TOTAL_PHOTO_BYTES = 1_500_000
+MAX_PHOTOS_PER_SHARE = 20
+
 
 def _connect():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -85,6 +93,35 @@ def _clean_text(value, limit=MAX_TEXT_LEN) -> str:
     return value.strip()[:limit]
 
 
+def _clean_photo(value, budget_used: int, count_used: int) -> tuple[str, int, int]:
+    """
+    Valider et bilde-felt og hold regnskap mot det delte bildebudsjettet.
+
+    Returnerer (data_url_eller_tom_streng, nytt_budget_brukt, nytt_antall). Et
+    bilde som er ugyldig, for stort alene, eller ville sprengt total-budsjettet
+    eller antallsgrensen, droppes stille — resten av observasjonen (og
+    delingen) skal ikke felles av ett bilde.
+
+    Kun JPEG godtas — det er det klienten faktisk produserer (nedskalert
+    canvas-thumbnail). Hvitelisting av mime-type framfor et generelt
+    `data:image/`-sjekk stenger blant annet ute `image/svg+xml`, som kan
+    inneholde skript — unødvendig risiko på et offentlig, uinnlogget
+    endepunkt når vi likevel bare venter oss JPEG.
+    """
+    if not isinstance(value, str) or not value.startswith('data:image/jpeg;base64,'):
+        return '', budget_used, count_used
+
+    size = len(value.encode('utf-8'))
+    if size > MAX_PHOTO_BYTES:
+        return '', budget_used, count_used
+    if count_used >= MAX_PHOTOS_PER_SHARE:
+        return '', budget_used, count_used
+    if budget_used + size > MAX_TOTAL_PHOTO_BYTES:
+        return '', budget_used, count_used
+
+    return value, budget_used + size, count_used + 1
+
+
 def sanitize_observations(raw) -> list:
     """
     Plukk ut de feltene som skal deles — alt annet forkastes.
@@ -98,6 +135,8 @@ def sanitize_observations(raw) -> list:
         return []
 
     rene = []
+    photo_budget_used = 0
+    photo_count = 0
     for obs in raw[:MAX_OBSERVATIONS]:
         if not isinstance(obs, dict):
             continue
@@ -115,6 +154,10 @@ def sanitize_observations(raw) -> list:
         except (TypeError, ValueError):
             antall = None
 
+        foto, photo_budget_used, photo_count = _clean_photo(
+            obs.get('photo'), photo_budget_used, photo_count
+        )
+
         rene.append({
             'taxonName': navn,
             'count': antall,
@@ -125,8 +168,20 @@ def sanitize_observations(raw) -> list:
             'timestamp': _clean_text(obs.get('timestamp'), 40),
             'tilKlokkeslett': _clean_text(obs.get('tilKlokkeslett'), 40),
             'comment': _clean_text(obs.get('comment')),
+            'photo': foto,
         })
     return rene
+
+
+def _text_payload_size_ok(rene: list) -> bool:
+    """
+    Sjekk tekstbudsjettet — beregnet UTEN bilder, som har sitt eget budsjett
+    (håndhevet i `_clean_photo` under `sanitize_observations`). Bilder skal
+    aldri kunne felle hele delingen slik et for stort tekstinnhold skal.
+    """
+    tekst_only = [{k: v for k, v in o.items() if k != 'photo'} for o in rene]
+    payload = json.dumps(tekst_only, ensure_ascii=False)
+    return len(payload.encode('utf-8')) <= MAX_PAYLOAD_BYTES
 
 
 def create_share(observations, display_name: str = '', email: str = '',
@@ -145,10 +200,10 @@ def create_share(observations, display_name: str = '', email: str = '',
     if not rene:
         return None
 
-    payload = json.dumps(rene, ensure_ascii=False)
-    if len(payload.encode('utf-8')) > MAX_PAYLOAD_BYTES:
-        logger.warning('[share] Payload for stor — avviser')
+    if not _text_payload_size_ok(rene):
+        logger.warning('[share] Tekstpayload for stor — avviser')
         return None
+    payload = json.dumps(rene, ensure_ascii=False)
 
     display_name = _clean_text(display_name, MAX_NAME_LEN)
     email = _clean_text(email, MAX_EMAIL_LEN)
@@ -208,6 +263,58 @@ def get_share(slug: str) -> dict | None:
             return data
     except Exception as e:
         logger.warning(f'[share] Feil ved henting: {e}')
+        return None
+
+
+def update_share(slug: str, delete_key: str, observations, display_name: str = '',
+                  email: str = '') -> dict | None:
+    """
+    Oppdater innholdet i en eksisterende deling — samme slug/URL, ny payload.
+
+    Brukes for lange feltøkter (f.eks. Herdla, flere timer i felt) der man vil
+    at en allerede utsendt lenke skal vise ferske funn, uten å måtte sende en
+    ny lenke til alle. `expires_ts` endres bevisst ikke — en oppdatering
+    forlenger ikke levetiden, den bare erstatter innholdet.
+
+    Returnerer None hvis slug ikke finnes, er utløpt, eller nøkkelen er feil.
+    """
+    if not slug or not delete_key:
+        return None
+    if len(slug) != _SLUG_LENGTH or any(c not in _SLUG_ALPHABET for c in slug):
+        return None
+
+    rene = sanitize_observations(observations)
+    if not rene:
+        return None
+
+    if not _text_payload_size_ok(rene):
+        logger.warning('[share] Tekstpayload for stor ved oppdatering — avviser')
+        return None
+    payload = json.dumps(rene, ensure_ascii=False)
+
+    display_name = _clean_text(display_name, MAX_NAME_LEN)
+    email = _clean_text(email, MAX_EMAIL_LEN)
+    if '@' not in email:
+        email = ''
+
+    try:
+        with _lock:
+            with _connect() as conn:
+                _purge_expired(conn)
+                cur = conn.execute(
+                    "UPDATE shares SET payload = ?, display_name = ?, email = ? "
+                    "WHERE slug = ? AND delete_key = ?",
+                    (payload, display_name, email, slug, delete_key)
+                )
+                conn.commit()
+                if cur.rowcount == 0:
+                    return None
+                row = conn.execute(
+                    "SELECT expires_ts FROM shares WHERE slug = ?", (slug,)
+                ).fetchone()
+                return {'slug': slug, 'expiresTs': row['expires_ts'] if row else None}
+    except Exception as e:
+        logger.warning(f'[share] Feil ved oppdatering: {e}')
         return None
 
 
