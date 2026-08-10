@@ -84,18 +84,24 @@ export function defaultCoObservers() {
 /**
  * Lagre observasjoner til localStorage
  * @param {Array} observations - Liste med observasjoner
+ * @returns {boolean} true hvis lagringen faktisk lyktes. En full localStorage
+ *   (f.eks. store bilder på iOS Safari, som har lavere kvote) kaster ved
+ *   setItem — det skjedde tidligere helt stille, og et nettopp lagt til
+ *   bilde kunne forsvinne uten at brukeren fikk vite det.
  */
 export function saveObservations(observations) {
-  if (!window.localStorage) return;
-  
+  if (!window.localStorage) return false;
+
   try {
     const payload = {
       version: 1,
       observations,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    return true;
   } catch (e) {
     console.warn('Kunne ikke lagre til localStorage', e);
+    return false;
   }
 }
 

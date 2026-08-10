@@ -648,7 +648,25 @@
         obs.coObservers = Array.from(selectedCoObservers);
         // Oppdater lagring
         observations[idx] = obs;
-        saveObservations(observations);
+        let lagret = saveObservations(observations);
+
+        // localStorage kan være full — særlig på iOS Safari, som har en lav
+        // kvote og der et 1600px-bilde som base64 kan sprenge den. Uten dette
+        // forsvant bildet i stillhet: setItem kastet, siden navigerte videre
+        // som om alt var lagret, og bildet var borte neste gang man så etter.
+        if (!lagret && obs.photo) {
+          delete obs.photo;
+          observations[idx] = obs;
+          lagret = saveObservations(observations);
+          if (lagret) {
+            alert('Bildet var for stort til å lagres på denne enheten (tom lagringsplass). Resten av endringene er lagret, men uten bildet.');
+          }
+        }
+        if (!lagret) {
+          alert('Kunne ikke lagre endringene — enheten har trolig ikke nok ledig lagringsplass. Prøv å tømme noen gamle observasjoner eller last ned en sikkerhetskopi og forsøk igjen.');
+          return;
+        }
+
         // Gå tilbake til index
         window.location.href = '/public/index.html';
       });
