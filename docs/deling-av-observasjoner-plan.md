@@ -176,12 +176,17 @@ administrere egne aktive delinger på («Mine delinger» fantes ikke, bare siste
 husket, kun for øyeblikkelig «trekk tilbake»).
 
 **Bilder er nå med** — punktet om bilder under «Ikke planlagt» i §1 er dermed foreldet.
-Egen, liten delings-thumbnail (maks 800px, JPEG kvalitet 0,6) genereres client-side fra
-observasjonens eksisterende `photo`-felt (satt via `edit.html`), atskilt fra tekstbudsjettet:
+Egen, liten delings-thumbnail genereres client-side fra observasjonens eksisterende
+`photo`-felt (satt via `edit.html`), atskilt fra tekstbudsjettet:
 
-- `MAX_PHOTO_BYTES` (~120 KB) per bilde, `MAX_TOTAL_PHOTO_BYTES` (~1,5 MB) og
-  `MAX_PHOTOS_PER_SHARE` (20) totalt per deling. Overskridelse dropper bildet stille —
-  feller aldri hele delingen, samme prinsipp som gjelder ellers i denne planen.
+- Trinnvis nedskalering (800px/q0.55 → 640px/q0.4 → 480px/q0.32 → 400px/q0.28) stopper så
+  snart resultatet er under ~68 000 tegn (~50 KB rådata) — nok for en rask oppdatering til
+  venner, ikke artsbestemmelse. `MAX_PHOTO_BYTES` (220 KB) per bilde er en server-side
+  bakstopper for de tilfellene ingen av trinnene når målet, ikke selve styringen.
+- `MAX_TOTAL_PHOTO_BYTES` (2,5 MB) og `MAX_PHOTOS_PER_SHARE` (20) totalt per deling.
+  Overskridelse dropper bildet stille — feller aldri hele delingen, samme prinsipp som
+  gjelder ellers i denne planen. Klienten varsler («⚠️ N bilde(r) kunne ikke bli med») hvis
+  noe faktisk falt bort, uansett om det skjedde client- eller server-side.
 - Kun `image/jpeg` godtas (hviteliste på mime-type, ikke bare `data:image/`-prefiks) —
   stenger blant annet ute `image/svg+xml`, som kan inneholde skript.
 - Canvas-nedskaleringen fjerner EXIF (kan inneholde GPS) som bieffekt — ingen egen
@@ -199,3 +204,35 @@ endres bevisst ikke (en oppdatering forlenger ikke levetiden).
 `{slug, deleteKey, ts}`), rent lokalt — ingen nytt serverendepunkt for selve oversikten.
 Samme `slug` oppdateres på plass i stedet for å dupliseres, både ved ny deling og ved
 oppdatering.
+
+### Etterspill — tre runder feilsøking i produksjon (v1.43.7–v1.43.11)
+
+Første virkelige deling med bilde (Herdla, samme dag) viste et tomt bilde uten forklaring.
+Rekkefølgen av funn er verdt å ha med, siden hver runde avdekket noe de forrige ikke gjorde:
+
+1. **Stille bortfall (v1.43.7).** `create_share()`/`update_share()` droppet ugyldige eller
+   for store bilder uten å si fra — verken til bruker eller logg. Lagt til `photosDropped`
+   i API-svaret og en `⚠️`-varsling i delings-dialogen. Nødvendig forutsetning for å kunne
+   diagnostisere resten.
+2. **Root cause #1: full localStorage (v1.43.8, delvis).** Et bilde i AO-kvalitet
+   (1600px/JPEG q0.85 fra `edit.html`) kan sprenge iOS Safaris lavere kvote. `saveObservations()`
+   i `storage.js` svelget `setItem`-feil i stillhet — bildet forsvant ved lagring, før det i
+   det hele tatt kom til delingsfunksjonen. Rettet til å returnere `true`/`false` og varsle.
+3. **Regresjon fra punkt 2 (v1.43.9, kritisk).** `edit.html` importerte aldri den fiksede
+   funksjonen — filen hadde en egen, lokal `saveObservations()` uten `return`, med samme
+   navn. Alle lagringer (også vellykkede) viste dermed falsk feilmelding og blokkerte
+   navigasjon. **Lærdom: samme funksjonsnavn definert to steder i samme fil-tre er en
+   stille duplisering som ikke oppdages av testene med mindre noe faktisk kaller filen der
+   den er brukt — vurder å samle lagringslogikk ett sted fremfor lokale kopier per side.**
+   Fanget umiddelbart av testagenten som skrev tester for punkt 2, før produksjon.
+4. **Root cause #2: for stramt bildebudsjett (v1.43.10–11).** Med lagringsbugen borte
+   dukket et nytt, reelt problem opp: ekte fugleobservasjonsbilder (vann, fjær,
+   bakgrunnstekstur) komprimerer dårlig. 800px/JPEG q0.6 landet ofte over den daværende
+   120 KB-grensen. Løst i to steg: hevet taket til 220 KB (sikkerhetsnett), og lagt til
+   trinnvis nedskalering som faktisk *sikter* mot en liten fil (~50 KB) i stedet for én fast
+   kvalitetsinnstilling.
+
+**Lærdom for videre arbeid med lagring/bilder:** localStorage er upålitelig for store
+data-URL-er på tvers av nettlesere (spesielt iOS Safari), og `JSON.stringify`/`setItem`-feil
+bør alltid sjekkes og varsles — aldri anta at et lagrings- eller sendekall lyktes uten å
+verifisere returverdien.

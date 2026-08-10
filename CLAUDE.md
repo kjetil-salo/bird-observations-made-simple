@@ -94,10 +94,13 @@ The `Handler` class routes requests:
   - **Personvern:** hvitelisting av felt — koordinater lagres aldri, `hideUntil`-obser slippes ikke gjennom
   - Levetid 14 dager (`SHARE_TTL_DAYS`). Utløp uten cron: `DELETE WHERE expires_ts < now` ved hver skriving
   - Spam-vern: egen per-IP-kvote (10/10 min), maks 200 obs og ~100 KB tekst per deling
-  - **Bilder:** valgfritt `photo`-felt per observasjon (client-side nedskalert til ~800px/JPEG q0.6,
-    kun `image/jpeg` godtas). Eget budsjett atskilt fra tekstbudsjettet: `MAX_PHOTO_BYTES` (~120 KB/bilde),
-    `MAX_TOTAL_PHOTO_BYTES` (~1,5 MB/deling), `MAX_PHOTOS_PER_SHARE` (20). Et for stort/ugyldig bilde
-    droppes stille — feller aldri hele delingen
+  - **Bilder:** valgfritt `photo`-felt per observasjon, kun `image/jpeg` godtas. Client-side
+    trinnvis nedskalering (800px/q0.55 → 640/0.4 → 480/0.32 → 400/0.28) sikter mot ~50 KB
+    («nok for en rask oppdatering til venner») — `MAX_PHOTO_BYTES` (220 KB/bilde) er kun en
+    server-side bakstopper. Eget budsjett atskilt fra tekstbudsjettet: `MAX_TOTAL_PHOTO_BYTES`
+    (2,5 MB/deling), `MAX_PHOTOS_PER_SHARE` (20). Et for stort/ugyldig bilde droppes stille —
+    feller aldri hele delingen, men `photosDropped` i API-svaret gir klienten beskjed om det
+    skjedde (vises som `⚠️`-varsel)
 - `/api/share-update` (POST) → oppdaterer innholdet i en eksisterende deling (samme slug/URL),
   krever `slug` + `deleteKey`. `expires_ts` endres bevisst ikke — forlenger ikke levetiden
 - `/api/share-delete` (POST) → trekker tilbake en deling; krever `slug` + `deleteKey`
@@ -140,6 +143,12 @@ Pure ES6 modules with no framework:
 - `observations.js` — Main observation form logic
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
+  - `saveObservations()` returnerer `true`/`false` for om `localStorage.setItem()` faktisk
+    lyktes (full kvote, f.eks. store bilder på iOS Safari, kaster ellers i stillhet).
+    `lastSaveError` (live-binding export) har teknisk feilbeskrivelse til varsling.
+    **Viktig:** alle sider som lagrer observasjoner må importere `saveObservations` herfra —
+    en lokal, egendefinert kopi med samme navn i `edit.html` forårsaket en kritisk regresjon
+    (v1.43.8→v1.43.9) der returverdien alltid var `undefined`
   - **Sendt-logg** (`sent_observations_v1`): `appendSentBatch()` / `loadSentBatches()`
   - Publiserte obser stemples med `sentTs` i arbeidslista → «✓ sendt»-merke og dublett-vern
     før neste sending. `sentTs` strippes ved «Kopier til lista» fra `sendt.html`
@@ -155,8 +164,9 @@ Pure ES6 modules with no framework:
     `mine-delinger.html`
   - `openShareDialog(observations, existing = null)` — satt `existing` ({slug, deleteKey}) åpner
     samme dialog i oppdater-modus mot `/api/share-update` i stedet for `/api/share`
-  - Bilder: `downscaleForShare()` lager en egen, liten delings-thumbnail (800px/JPEG q0.6) fra
-    `obs.photo` — atskilt fra den større AO-kvalitets-thumbnailen `edit.html` lager
+  - Bilder: `nedskalerMedFallback()` prøver `downscaleForShare()` trinnvis (800px/q0.55 →
+    640/0.4 → 480/0.32 → 400/0.28) til resultatet er under ~50 KB, fra `obs.photo` — atskilt
+    fra den større AO-kvalitets-thumbnailen `edit.html` lager
 - `autocomplete.js` — Lokalitet-autocomplete med avstand og ikoner (🏷️ super, 👤 privat, ⭐ mine)
   - Aktivt i **begge** modi (Felt og Etterregistrering)
   - `initAutocomplete(placeInput, onSelect, getPosition)` — getPosition gir GPS-posisjon for sortering
