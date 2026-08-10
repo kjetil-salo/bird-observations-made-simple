@@ -38,20 +38,62 @@ function formatDato(iso) {
   return `${dag}. ${mnd[m - 1]} ${aar}`;
 }
 
-function huskDeling(slug, deleteKey) {
+/**
+ * Lag en liten delings-thumbnail fra et allerede eksisterende bilde (data-URL).
+ *
+ * Egen, mye mindre nedskalering enn AO-kvalitets-bildet fra edit.html —
+ * dette skal bo i en offentlig, uinnlogget deling, ikke brukes til
+ * artsbestemmelse. Canvas-omtegning fjerner samtidig EXIF (kan inneholde
+ * GPS), samme bieffekt som edit.html allerede drar nytte av.
+ */
+function downscaleForShare(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxSide = 800;
+      let { width, height } = img;
+      if (width > maxSide || height > maxSide) {
+        if (width > height) { height = Math.round(height * maxSide / width); width = maxSide; }
+        else { width = Math.round(width * maxSide / height); height = maxSide; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.onerror = () => reject(new Error('Kunne ikke lese bildet'));
+    img.src = dataUrl;
+  });
+}
+
+/** Alle delinger appen kjenner til fra denne enheten, nyeste først. */
+export function hentMineDelinger() {
   try {
-    const liste = JSON.parse(localStorage.getItem(SHARES_KEY) || '[]');
-    liste.unshift({ slug, deleteKey, ts: Date.now() });
-    localStorage.setItem(SHARES_KEY, JSON.stringify(liste.slice(0, 20)));
+    return JSON.parse(localStorage.getItem(SHARES_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Husk (eller oppdater) en deling lokalt. Samme `slug` flyttes til toppen
+ * og overskrives i stedet for å dupliseres — brukes både ved opprettelse og
+ * ved oppdatering av en eksisterende deling.
+ */
+function huskDeling(record) {
+  try {
+    const uten = hentMineDelinger().filter((d) => d.slug !== record.slug);
+    uten.unshift(record);
+    localStorage.setItem(SHARES_KEY, JSON.stringify(uten.slice(0, 20)));
   } catch (e) {
     console.warn('Kunne ikke lagre deling lokalt', e);
   }
 }
 
-function glemDeling(slug) {
+export function glemDeling(slug) {
   try {
-    const liste = JSON.parse(localStorage.getItem(SHARES_KEY) || '[]');
-    localStorage.setItem(SHARES_KEY, JSON.stringify(liste.filter((d) => d.slug !== slug)));
+    localStorage.setItem(SHARES_KEY, JSON.stringify(hentMineDelinger().filter((d) => d.slug !== slug)));
   } catch (e) {
     console.warn('Kunne ikke fjerne deling lokalt', e);
   }
@@ -86,11 +128,12 @@ const knappSekundaer = 'padding:8px 16px;border:1px solid var(--border,rgba(148,
 const knappPrimaer = 'padding:8px 16px;border:none;border-radius:6px;background:var(--accent,#3b82f6);color:white;cursor:pointer;font-size:0.9em;font-weight:500;';
 
 /** Vis den ferdige lenken med kopier- og tilbaketrekkings-knapp. */
-function visResultat(box, overlay, url, slug, deleteKey) {
-  huskDeling(slug, deleteKey);
+function visResultat(box, overlay, url, record, erOppdatering) {
+  huskDeling(record);
+  const { slug, deleteKey } = record;
 
   box.innerHTML = `
-    <h3 style="margin:0 0 12px 0;font-size:1.05em;">🔗 Lenken er klar</h3>
+    <h3 style="margin:0 0 12px 0;font-size:1.05em;">${erOppdatering ? '🔄 Delingen er oppdatert' : '🔗 Lenken er klar'}</h3>
     <input id="share-url" readonly value="${url}"
       style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border,rgba(148,163,184,0.25));background:var(--card-bg);color:var(--text);font-size:16px;box-sizing:border-box;" />
     <p style="margin:10px 0 16px 0;font-size:0.8em;color:var(--muted);line-height:1.4;">
@@ -136,9 +179,15 @@ function visResultat(box, overlay, url, slug, deleteKey) {
   });
 }
 
-/** Åpne forhåndsvisning og la brukeren lage en delingslenke. */
-export function openShareDialog(observations) {
+/**
+ * Åpne forhåndsvisning og la brukeren lage — eller oppdatere — en delingslenke.
+ * @param {Array} observations
+ * @param {{slug: string, deleteKey: string}|null} existing - satt ved oppdatering
+ *   av en eksisterende deling (samme URL); null ved ny deling.
+ */
+export function openShareDialog(observations, existing = null) {
   if (!observations.length) return;
+  const erOppdatering = !!existing;
 
   const skjulte = observations.filter((o) => o.hideUntil).length;
   const delbare = observations.filter((o) => !o.hideUntil);
@@ -156,20 +205,31 @@ export function openShareDialog(observations) {
     const navn = (obs.species && obs.species.taxonName) || '';
     const tid = (obs.timestamp || '').slice(11, 16);
     const sted = obs.placeName || '';
+    const fotoHtml = obs.photo ? `
+        <label style="display:flex;align-items:center;gap:6px;margin:4px 0 0 30px;font-size:0.78em;color:var(--muted);cursor:pointer;">
+          <img src="${obs.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0;" alt="" />
+          <input type="checkbox" data-photo-idx="${i}" checked style="margin:0;" /> Del bilde
+        </label>` : '';
     return `
-      <label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border,rgba(148,163,184,0.15));cursor:pointer;">
-        <input type="checkbox" data-idx="${i}" ${forvalgt.has(obs) ? 'checked' : ''} style="margin-top:3px;flex-shrink:0;" />
-        <span style="flex:1;font-size:0.9em;">
-          <b>${obs.count || ''} ${navn}</b>
-          <span style="color:var(--muted);"> ${tid}</span>
-          <br><span style="color:var(--muted);font-size:0.9em;">${sted}</span>
-        </span>
-      </label>`;
+      <div style="padding:8px 0;border-bottom:1px solid var(--border,rgba(148,163,184,0.15));">
+        <label style="display:flex;gap:10px;align-items:flex-start;margin:0;cursor:pointer;">
+          <input type="checkbox" data-idx="${i}" ${forvalgt.has(obs) ? 'checked' : ''} style="margin-top:3px;flex-shrink:0;" />
+          <span style="flex:1;font-size:0.9em;">
+            <b>${obs.count || ''} ${navn}</b>
+            <span style="color:var(--muted);"> ${tid}</span>
+            <br><span style="color:var(--muted);font-size:0.9em;">${sted}</span>
+          </span>
+        </label>
+        ${fotoHtml}
+      </div>`;
   }).join('');
 
+  const knappTekst = erOppdatering ? 'Oppdater' : 'Lag lenke';
+
   box.innerHTML = `
-    <h3 style="margin:0 0 4px 0;font-size:1.05em;">🔗 Del funnene</h3>
+    <h3 style="margin:0 0 4px 0;font-size:1.05em;">${erOppdatering ? '🔄 Oppdater delingen' : '🔗 Del funnene'}</h3>
     <p style="margin:0 0 14px 0;font-size:0.8em;color:var(--muted);line-height:1.35;">
+      ${erOppdatering ? 'Samme lenke fortsetter å virke — innholdet erstattes. ' : ''}
       ${dato ? `Forhåndsvalgt: ${dato}. ` : ''}Hak av det du vil dele.
       ${skjulte ? `<br>${skjulte} skjult${skjulte !== 1 ? 'e' : ''} observasjon${skjulte !== 1 ? 'er' : ''} er utelatt.` : ''}
     </p>
@@ -182,15 +242,15 @@ export function openShareDialog(observations) {
     </p>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button type="button" id="share-cancel" style="${knappSekundaer}">Avbryt</button>
-      <button type="button" id="share-create" style="${knappPrimaer}">Lag lenke</button>
+      <button type="button" id="share-create" style="${knappPrimaer}">${knappTekst}</button>
     </div>`;
 
   box.querySelector('#share-cancel').addEventListener('click', () => overlay.remove());
 
   box.querySelector('#share-create').addEventListener('click', async (e) => {
-    const valgte = [...box.querySelectorAll('#share-list input:checked')]
-      .map((cb) => delbare[Number(cb.dataset.idx)]);
-    if (!valgte.length) {
+    const valgteIdx = [...box.querySelectorAll('#share-list input[data-idx]:checked')]
+      .map((cb) => Number(cb.dataset.idx));
+    if (!valgteIdx.length) {
       alert('Velg minst én observasjon.');
       return;
     }
@@ -205,19 +265,58 @@ export function openShareDialog(observations) {
     const epost = !navn && lagretAoBruker.includes('@') ? lagretAoBruker : '';
 
     e.target.disabled = true;
-    e.target.textContent = 'Lager lenke…';
+    e.target.textContent = erOppdatering ? 'Oppdaterer…' : 'Lager lenke…';
     try {
-      const resp = await fetch('/api/share', {
+      // Nedskaler bare bildene som faktisk skal deles — resten strippes helt
+      // fra det som sendes (ikke bare skjules på siden etterpå).
+      const valgte = await Promise.all(valgteIdx.map(async (idx) => {
+        const obs = delbare[idx];
+        const fotoCb = box.querySelector(`#share-list input[data-photo-idx="${idx}"]`);
+        if (obs.photo && fotoCb && fotoCb.checked) {
+          try {
+            const foto = await downscaleForShare(obs.photo);
+            return { ...obs, photo: foto };
+          } catch (_) {
+            const { photo, ...rest } = obs;
+            return rest;
+          }
+        }
+        const { photo, ...rest } = obs;
+        return rest;
+      }));
+
+      const endepunkt = erOppdatering ? '/api/share-update' : '/api/share';
+      const body = erOppdatering
+        ? { slug: existing.slug, deleteKey: existing.deleteKey, observations: valgte, displayName: navn, email: epost }
+        : { observations: valgte, displayName: navn, email: epost };
+
+      const resp = await fetch(endepunkt, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ observations: valgte, displayName: navn, email: epost }),
+        body: JSON.stringify(body),
       });
       const result = await resp.json();
-      if (!resp.ok || !result.ok) throw new Error(result.error || 'Kunne ikke lage lenke');
-      visResultat(box, overlay, window.location.origin + result.url, result.slug, result.deleteKey);
+      if (!resp.ok || !result.ok) {
+        throw new Error(result.error || (erOppdatering ? 'Kunne ikke oppdatere delingen' : 'Kunne ikke lage lenke'));
+      }
+
+      const slug = result.slug;
+      const deleteKey = erOppdatering ? existing.deleteKey : result.deleteKey;
+      const url = erOppdatering ? `${window.location.origin}/d/${slug}` : window.location.origin + result.url;
+      const nyesteValgtDato = nyesteDagsObservasjoner(valgte).map(obsDato).filter(Boolean)[0] || '';
+      const record = {
+        slug,
+        deleteKey,
+        ts: Date.now(),
+        displayName: navn,
+        obsCount: valgte.length,
+        dato: nyesteValgtDato,
+        expiresTs: result.expiresTs,
+      };
+      visResultat(box, overlay, url, record, erOppdatering);
     } catch (err) {
       e.target.disabled = false;
-      e.target.textContent = 'Lag lenke';
+      e.target.textContent = knappTekst;
       alert(err.message);
     }
   });

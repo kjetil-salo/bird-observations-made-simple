@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mine delinger</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <style>
+      body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+             background: var(--bg, #0f172a); color: var(--text, #e5e7eb); padding: 16px; margin: 0; }
+      .shell { max-width: 640px; margin: 0 auto; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+      h1 { font-size: 1.25rem; margin: 0; }
+      .back-link { color: var(--accent, #3b82f6); text-decoration: none; font-size: 0.9rem; }
+      .ingress { color: var(--muted, #9ca3af); font-size: 0.85rem; line-height: 1.4; margin: 0 0 18px; }
+      .deling { background: rgba(255,255,255,0.04); border: 1px solid rgba(148,163,184,0.15);
+                border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+      .deling.utlopt { opacity: 0.6; }
+      .deling-head { display: flex; justify-content: space-between; align-items: baseline;
+                     gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+      .deling-tittel { font-weight: 600; }
+      .deling-meta { color: var(--muted, #9ca3af); font-size: 0.85rem; }
+      .status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem;
+                font-weight: 500; margin-left: 8px; vertical-align: middle; }
+      .status.aktiv { background: rgba(34,197,94,0.15); color: #4ade80; }
+      .status.utlopt-badge { background: rgba(148,163,184,0.15); color: #94a3b8; }
+      .lenke { display: block; color: #93c5fd; font-size: 0.85rem; text-decoration: none;
+               margin: 6px 0 10px; word-break: break-all; }
+      .knapper { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+      .btn-liten { padding: 7px 12px; border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+                   border: 1px solid rgba(148,163,184,0.25); background: transparent; color: var(--text, #e5e7eb); }
+      .btn-liten.primar { background: var(--accent, #3b82f6); border-color: transparent; color: #fff; }
+      .btn-liten:disabled { opacity: 0.6; cursor: default; }
+      .tom { text-align: center; color: var(--muted, #9ca3af); padding: 40px 16px; line-height: 1.5; }
+      body.theme-light { background: #ffffff !important; color: #1a1a1a !important; }
+      body.theme-light .deling { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+      body.theme-light .lenke { color: #1d4ed8 !important; }
+    </style>
+  </head>
+  <body>
+    <script src="/js/theme.js"></script>
+    <div class="shell">
+      <header>
+        <h1>🔗 Mine delinger</h1>
+        <a href="/" class="back-link">← Tilbake</a>
+      </header>
+      <p class="ingress">
+        Delinger du har laget fra denne enheten. Lagres bare lokalt — appen har ingen
+        egen konto, så en deling laget på en annen enhet vises ikke her.
+      </p>
+      <div id="liste"></div>
+    </div>
+
+    <script type="module">
+      import { hentMineDelinger, glemDeling, openShareDialog } from '/js/share.js';
+      import { loadObservations } from '/js/storage.js';
+
+      const MND = ['januar', 'februar', 'mars', 'april', 'mai', 'juni',
+        'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+
+      function formatDato(iso) {
+        if (!iso || iso.length < 10) return '';
+        const [aar, m, dag] = iso.slice(0, 10).split('-').map(Number);
+        return `${dag}. ${MND[m - 1]} ${aar}`;
+      }
+
+      function formatUtloper(expiresTs) {
+        if (!expiresTs) return '';
+        const d = new Date(expiresTs * 1000);
+        if (isNaN(d)) return '';
+        return `${d.getDate()}. ${MND[d.getMonth()]}`;
+      }
+
+      function erUtlopt(deling) {
+        return !!deling.expiresTs && deling.expiresTs * 1000 < Date.now();
+      }
+
+      function tekst(v) {
+        const el = document.createElement('span');
+        el.textContent = v == null ? '' : String(v);
+        return el.innerHTML;
+      }
+
+      const listeEl = document.getElementById('liste');
+
+      function render() {
+        const delinger = hentMineDelinger();
+
+        if (!delinger.length) {
+          listeEl.innerHTML = `<div class="tom">
+            Ingen delinger ennå.<br>
+            Bruk «🔗 Del funnene» på hovedsiden for å lage din første.
+          </div>`;
+          return;
+        }
+
+        listeEl.innerHTML = delinger.map((d, idx) => {
+          const utlopt = erUtlopt(d);
+          const slug = tekst(d.slug);
+          const tittel = d.displayName ? tekst(d.displayName) : (formatDato(d.dato) || 'Deling');
+          const antall = d.obsCount ? `${d.obsCount} observasjon${d.obsCount !== 1 ? 'er' : ''}` : '';
+          const statusHtml = utlopt
+            ? '<span class="status utlopt-badge">Utløpt</span>'
+            : `<span class="status aktiv">Aktiv${d.expiresTs ? ' · til ' + formatUtloper(d.expiresTs) : ''}</span>`;
+          return `
+            <div class="deling ${utlopt ? 'utlopt' : ''}">
+              <div class="deling-head">
+                <span class="deling-tittel">${tittel}${statusHtml}</span>
+                <span class="deling-meta">${antall}</span>
+              </div>
+              <a class="lenke" href="/d/${slug}" target="_blank" rel="noopener">${location.origin}/d/${slug}</a>
+              <div class="knapper">
+                <button class="btn-liten primar" data-oppdater="${idx}" ${utlopt ? 'disabled' : ''}>🔄 Oppdater</button>
+                <button class="btn-liten" data-trekk="${idx}">🗑️ Trekk tilbake</button>
+              </div>
+            </div>`;
+        }).join('');
+      }
+
+      render();
+
+      listeEl.addEventListener('click', async (e) => {
+        const oppdaterIdx = e.target.dataset && e.target.dataset.oppdater;
+        const trekkIdx = e.target.dataset && e.target.dataset.trekk;
+
+        if (oppdaterIdx != null) {
+          const delinger = hentMineDelinger();
+          const d = delinger[Number(oppdaterIdx)];
+          if (!d) return;
+          const observations = loadObservations();
+          if (!observations.length) {
+            alert('Arbeidslista er tom på denne enheten — ingenting å oppdatere delingen med.');
+            return;
+          }
+          openShareDialog(observations, { slug: d.slug, deleteKey: d.deleteKey });
+          // Del-dialogen lagrer selv oppdatert metadata lokalt ved suksess — re-render
+          // når dialogen lukkes, så lista viser fersk status.
+          const observer = new MutationObserver(() => {
+            if (!document.getElementById('share-modal')) {
+              observer.disconnect();
+              render();
+            }
+          });
+          observer.observe(document.body, { childList: true });
+          return;
+        }
+
+        if (trekkIdx != null) {
+          const delinger = hentMineDelinger();
+          const d = delinger[Number(trekkIdx)];
+          if (!d) return;
+          if (!confirm('Trekke tilbake denne delingen? Lenken slutter å virke med en gang.')) return;
+
+          e.target.disabled = true;
+          try {
+            const r = await fetch('/api/share-delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ slug: d.slug, deleteKey: d.deleteKey }),
+            });
+            // 404 betyr at delingen allerede var borte (utløpt/slettet fra før) —
+            // fjern den lokalt uansett, det er uansett riktig sluttilstand.
+            if (!r.ok && r.status !== 404) throw new Error();
+            glemDeling(d.slug);
+            render();
+          } catch (_) {
+            e.target.disabled = false;
+            alert('Kunne ikke trekke tilbake — prøv igjen om litt.');
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
