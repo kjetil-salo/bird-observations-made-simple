@@ -46,11 +46,10 @@ function formatDato(iso) {
  * artsbestemmelse. Canvas-omtegning fjerner samtidig EXIF (kan inneholde
  * GPS), samme bieffekt som edit.html allerede drar nytte av.
  */
-function downscaleForShare(dataUrl, quality = 0.6) {
+function downscaleForShare(dataUrl, quality, maxSide) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const maxSide = 800;
       let { width, height } = img;
       if (width > maxSide || height > maxSide) {
         if (width > height) { height = Math.round(height * maxSide / width); width = maxSide; }
@@ -67,20 +66,30 @@ function downscaleForShare(dataUrl, quality = 0.6) {
   });
 }
 
-// Serverens budsjett er MAX_PHOTO_BYTES (220 KB, share_store.py) — hold god
-// margin under det siden data-URL-en har base64-overhead + prefiks.
-const SHARE_PHOTO_MAX_CHARS = 200_000;
+// Mål: ~50 KB rådata per bilde er nok for en rask oppdatering til venner —
+// ikke artsbestemmelse. ~68 000 tegn i data-URL-en tilsvarer omtrent det,
+// etter base64-overhead (4/3) + prefiks. Serverens MAX_PHOTO_BYTES (220 KB,
+// share_store.py) er bakstopperen hvis selv laveste trinn ikke når målet.
+const SHARE_PHOTO_TARGET_CHARS = 68_000;
+const NEDSKALERINGSTRINN = [
+  { maxSide: 800, quality: 0.55 },
+  { maxSide: 640, quality: 0.4 },
+  { maxSide: 480, quality: 0.32 },
+  { maxSide: 400, quality: 0.28 },
+];
 
 /**
- * Nedskaler til delings-thumbnail, med automatisk fallback til lavere
- * kvalitet hvis resultatet fortsatt er stort. Detaljerte naturbilder (vann,
- * fjær, bakgrunnstekstur) komprimerer dårlig ved q0.6 — uten dette ble slike
- * bilder ofte droppet av serveren i stedet for faktisk delt.
+ * Nedskaler til delings-thumbnail. Prøver stadig mindre/lavere kvalitet til
+ * resultatet er under måltørrelsen — detaljerte naturbilder (vann, fjær,
+ * bakgrunnstekstur) komprimerer dårlig, og ett trinn holdt sjelden målet.
+ * Treffer ingen av trinnene målet, brukes uansett det siste (minste) forsøket
+ * — serveren er bakstopperen om det fortsatt er for stort.
  */
 async function nedskalerMedFallback(dataUrl) {
-  let foto = await downscaleForShare(dataUrl, 0.6);
-  if (foto.length > SHARE_PHOTO_MAX_CHARS) {
-    foto = await downscaleForShare(dataUrl, 0.35);
+  let foto = null;
+  for (const { maxSide, quality } of NEDSKALERINGSTRINN) {
+    foto = await downscaleForShare(dataUrl, quality, maxSide);
+    if (foto.length <= SHARE_PHOTO_TARGET_CHARS) break;
   }
   return foto;
 }
