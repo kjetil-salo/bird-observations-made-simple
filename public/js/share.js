@@ -46,7 +46,7 @@ function formatDato(iso) {
  * artsbestemmelse. Canvas-omtegning fjerner samtidig EXIF (kan inneholde
  * GPS), samme bieffekt som edit.html allerede drar nytte av.
  */
-function downscaleForShare(dataUrl) {
+function downscaleForShare(dataUrl, quality = 0.6) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -60,11 +60,29 @@ function downscaleForShare(dataUrl) {
       canvas.width = width;
       canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.6));
+      resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.onerror = () => reject(new Error('Kunne ikke lese bildet'));
     img.src = dataUrl;
   });
+}
+
+// Serverens budsjett er MAX_PHOTO_BYTES (220 KB, share_store.py) — hold god
+// margin under det siden data-URL-en har base64-overhead + prefiks.
+const SHARE_PHOTO_MAX_CHARS = 200_000;
+
+/**
+ * Nedskaler til delings-thumbnail, med automatisk fallback til lavere
+ * kvalitet hvis resultatet fortsatt er stort. Detaljerte naturbilder (vann,
+ * fjær, bakgrunnstekstur) komprimerer dårlig ved q0.6 — uten dette ble slike
+ * bilder ofte droppet av serveren i stedet for faktisk delt.
+ */
+async function nedskalerMedFallback(dataUrl) {
+  let foto = await downscaleForShare(dataUrl, 0.6);
+  if (foto.length > SHARE_PHOTO_MAX_CHARS) {
+    foto = await downscaleForShare(dataUrl, 0.35);
+  }
+  return foto;
 }
 
 /** Alle delinger appen kjenner til fra denne enheten, nyeste først. */
@@ -284,7 +302,7 @@ export function openShareDialog(observations, existing = null) {
         const fotoCb = box.querySelector(`#share-list input[data-photo-idx="${idx}"]`);
         if (obs.photo && fotoCb && fotoCb.checked) {
           try {
-            const foto = await downscaleForShare(obs.photo);
+            const foto = await nedskalerMedFallback(obs.photo);
             return { ...obs, photo: foto };
           } catch (err) {
             console.warn('Kunne ikke nedskalere bilde for deling', err);

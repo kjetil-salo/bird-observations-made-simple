@@ -138,8 +138,11 @@ def test_totalt_bildebudsjett_kutter_de_siste():
     Flere bilder som til sammen sprenger MAX_TOTAL_PHOTO_BYTES: de første skal
     inkluderes til budsjettet er brukt opp, resten skal droppes.
     """
-    per_foto = 100_000
-    antall_som_bor_ga_inn = share_store.MAX_TOTAL_PHOTO_BYTES // per_foto  # 15
+    # per_foto må være stor nok til at total-byte-budsjettet slår inn FØR
+    # antallsgrensen (MAX_PHOTOS_PER_SHARE) gjør det.
+    per_foto = share_store.MAX_TOTAL_PHOTO_BYTES // (share_store.MAX_PHOTOS_PER_SHARE - 4)
+    antall_som_bor_ga_inn = share_store.MAX_TOTAL_PHOTO_BYTES // per_foto
+    assert antall_som_bor_ga_inn < share_store.MAX_PHOTOS_PER_SHARE
     total_forsok = antall_som_bor_ga_inn + 3
 
     fotos = [_photo_of_size(per_foto) for _ in range(total_forsok)]

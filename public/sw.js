@@ -1,5 +1,5 @@
 // Service Worker for offline-støtte
-const CACHE_NAME = 'fugleobs-v79';
+const CACHE_NAME = 'fugleobs-v80';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

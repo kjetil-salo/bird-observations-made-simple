@@ -44,10 +44,16 @@ MAX_TEXT_LEN = 500
 
 # Bilder har et eget budsjett, atskilt fra tekstbudsjettet over — et par
 # bilder skal aldri kunne felle hele delingen. Klienten nedskalerer alltid
-# til en liten delings-thumbnail (~800px/JPEG q0.6) før innsending; grensene
-# her er en server-side bakstopper, ikke den primære størrelsesstyringen.
-MAX_PHOTO_BYTES = 120_000
-MAX_TOTAL_PHOTO_BYTES = 1_500_000
+# til en liten delings-thumbnail (~800px/JPEG q0.6, med automatisk fallback
+# til q0.35 hvis resultatet fortsatt er stort) før innsending; grensene her
+# er en server-side bakstopper, ikke den primære størrelsesstyringen.
+#
+# 120 KB viste seg for stramt i praksis: ekte fugleobservasjonsbilder (vann,
+# fjær, bakgrunnstekstur) komprimerer dårlig og landet ofte over grensen selv
+# nedskalert — bildet ble da droppet stille (siden fikset i v1.43.7 med
+# varsel, men selve bortfallet var fortsatt for hyppig). Hevet til 220 KB.
+MAX_PHOTO_BYTES = 220_000
+MAX_TOTAL_PHOTO_BYTES = 2_500_000
 MAX_PHOTOS_PER_SHARE = 20
 
 
