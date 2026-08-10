@@ -348,6 +348,7 @@ class Handler(SimpleHTTPRequestHandler):
                 'url': f"/d/{result['slug']}",
                 'deleteKey': result['deleteKey'],
                 'expiresTs': result['expiresTs'],
+                'photosDropped': result.get('photosDropped', 0),
             })
         except Exception as e:
             logger.error(f'[SHARE] Feil ved oppretting: {e}')
@@ -376,7 +377,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
 
             logger.info(f"[SHARE] Oppdatert {result['slug']}")
-            self._send_json({'ok': True, 'slug': result['slug'], 'expiresTs': result['expiresTs']})
+            self._send_json({
+                'ok': True,
+                'slug': result['slug'],
+                'expiresTs': result['expiresTs'],
+                'photosDropped': result.get('photosDropped', 0),
+            })
         except Exception as e:
             logger.error(f'[SHARE] Feil ved oppdatering: {e}')
             self._send_json({'error': 'Kunne ikke oppdatere deling'}, status=500)

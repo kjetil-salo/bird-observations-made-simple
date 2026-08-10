@@ -128,12 +128,19 @@ const knappSekundaer = 'padding:8px 16px;border:1px solid var(--border,rgba(148,
 const knappPrimaer = 'padding:8px 16px;border:none;border-radius:6px;background:var(--accent,#3b82f6);color:white;cursor:pointer;font-size:0.9em;font-weight:500;';
 
 /** Vis den ferdige lenken med kopier- og tilbaketrekkings-knapp. */
-function visResultat(box, overlay, url, record, erOppdatering) {
+function visResultat(box, overlay, url, record, erOppdatering, bilderFalt) {
   huskDeling(record);
   const { slug, deleteKey } = record;
 
+  const bilderVarsel = bilderFalt > 0
+    ? `<p style="margin:0 0 10px 0;padding:8px 10px;border-radius:8px;background:rgba(251,191,36,0.12);color:#fbbf24;font-size:0.8em;line-height:1.4;">
+        ⚠️ ${bilderFalt} bilde${bilderFalt !== 1 ? 'r' : ''} kunne ikke bli med i delingen (for stort, eller nettleseren fikk ikke behandlet det). Resten er delt som normalt.
+      </p>`
+    : '';
+
   box.innerHTML = `
     <h3 style="margin:0 0 12px 0;font-size:1.05em;">${erOppdatering ? '🔄 Delingen er oppdatert' : '🔗 Lenken er klar'}</h3>
+    ${bilderVarsel}
     <input id="share-url" readonly value="${url}"
       style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border,rgba(148,163,184,0.25));background:var(--card-bg);color:var(--text);font-size:16px;box-sizing:border-box;" />
     <p style="margin:10px 0 16px 0;font-size:0.8em;color:var(--muted);line-height:1.4;">
@@ -268,7 +275,10 @@ export function openShareDialog(observations, existing = null) {
     e.target.textContent = erOppdatering ? 'Oppdaterer…' : 'Lager lenke…';
     try {
       // Nedskaler bare bildene som faktisk skal deles — resten strippes helt
-      // fra det som sendes (ikke bare skjules på siden etterpå).
+      // fra det som sendes (ikke bare skjules på siden etterpå). Feiler
+      // nedskaleringen (f.eks. et bilde nettleseren ikke klarer å lese inn i
+      // et canvas), telles det — bilde-bortfall skal aldri skje i stillhet.
+      let bilderFeiletKlient = 0;
       const valgte = await Promise.all(valgteIdx.map(async (idx) => {
         const obs = delbare[idx];
         const fotoCb = box.querySelector(`#share-list input[data-photo-idx="${idx}"]`);
@@ -276,7 +286,9 @@ export function openShareDialog(observations, existing = null) {
           try {
             const foto = await downscaleForShare(obs.photo);
             return { ...obs, photo: foto };
-          } catch (_) {
+          } catch (err) {
+            console.warn('Kunne ikke nedskalere bilde for deling', err);
+            bilderFeiletKlient++;
             const { photo, ...rest } = obs;
             return rest;
           }
@@ -313,7 +325,8 @@ export function openShareDialog(observations, existing = null) {
         dato: nyesteValgtDato,
         expiresTs: result.expiresTs,
       };
-      visResultat(box, overlay, url, record, erOppdatering);
+      const bilderFalt = bilderFeiletKlient + (result.photosDropped || 0);
+      visResultat(box, overlay, url, record, erOppdatering, bilderFalt);
     } catch (err) {
       e.target.disabled = false;
       e.target.textContent = knappTekst;

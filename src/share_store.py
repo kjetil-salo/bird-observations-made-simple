@@ -184,6 +184,25 @@ def _text_payload_size_ok(rene: list) -> bool:
     return len(payload.encode('utf-8')) <= MAX_PAYLOAD_BYTES
 
 
+def _count_dropped_photos(raw: list, rene: list) -> int:
+    """
+    Hvor mange bilder ble forsøkt delt, men droppet av `_clean_photo`
+    (ugyldig format, for stort enkeltbilde, eller budsjett/antall sprengt)?
+
+    Rent informativt tall til klienten — appen skal aldri felle en deling på
+    grunn av bilder, men brukeren skal få vite om noe falt bort i stillhet,
+    i stedet for at det bare mangler uten forklaring.
+    """
+    if not isinstance(raw, list):
+        return 0
+    forsokt = sum(
+        1 for o in raw
+        if isinstance(o, dict) and isinstance(o.get('photo'), str) and o.get('photo')
+    )
+    inkludert = sum(1 for o in rene if o.get('photo'))
+    return max(0, forsokt - inkludert)
+
+
 def create_share(observations, display_name: str = '', email: str = '',
                  ttl_days: int = SHARE_TTL_DAYS) -> dict | None:
     """
@@ -204,6 +223,7 @@ def create_share(observations, display_name: str = '', email: str = '',
         logger.warning('[share] Tekstpayload for stor — avviser')
         return None
     payload = json.dumps(rene, ensure_ascii=False)
+    photos_dropped = _count_dropped_photos(observations, rene)
 
     display_name = _clean_text(display_name, MAX_NAME_LEN)
     email = _clean_text(email, MAX_EMAIL_LEN)
@@ -226,7 +246,8 @@ def create_share(observations, display_name: str = '', email: str = '',
                             (slug, payload, display_name, email, delete_key, now, expires_ts)
                         )
                         conn.commit()
-                        return {'slug': slug, 'deleteKey': delete_key, 'expiresTs': expires_ts}
+                        return {'slug': slug, 'deleteKey': delete_key, 'expiresTs': expires_ts,
+                                'photosDropped': photos_dropped}
                     except sqlite3.IntegrityError:
                         continue  # kollisjon — svært usannsynlig, prøv ny slug
         logger.warning('[share] Klarte ikke generere unik slug')
@@ -291,6 +312,7 @@ def update_share(slug: str, delete_key: str, observations, display_name: str = '
         logger.warning('[share] Tekstpayload for stor ved oppdatering — avviser')
         return None
     payload = json.dumps(rene, ensure_ascii=False)
+    photos_dropped = _count_dropped_photos(observations, rene)
 
     display_name = _clean_text(display_name, MAX_NAME_LEN)
     email = _clean_text(email, MAX_EMAIL_LEN)
@@ -312,7 +334,8 @@ def update_share(slug: str, delete_key: str, observations, display_name: str = '
                 row = conn.execute(
                     "SELECT expires_ts FROM shares WHERE slug = ?", (slug,)
                 ).fetchone()
-                return {'slug': slug, 'expiresTs': row['expires_ts'] if row else None}
+                return {'slug': slug, 'expiresTs': row['expires_ts'] if row else None,
+                        'photosDropped': photos_dropped}
     except Exception as e:
         logger.warning(f'[share] Feil ved oppdatering: {e}')
         return None
