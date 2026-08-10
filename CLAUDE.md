@@ -93,9 +93,17 @@ The `Handler` class routes requests:
   - Lagres i `src/share_store.py` (SQLite, samme `stats.db`). Slug: 12 tegn fra entydig alfabet
   - **Personvern:** hvitelisting av felt — koordinater lagres aldri, `hideUntil`-obser slippes ikke gjennom
   - Levetid 14 dager (`SHARE_TTL_DAYS`). Utløp uten cron: `DELETE WHERE expires_ts < now` ved hver skriving
-  - Spam-vern: egen per-IP-kvote (10/10 min), maks 200 obs og ~100 KB per deling
+  - Spam-vern: egen per-IP-kvote (10/10 min), maks 200 obs og ~100 KB tekst per deling
+  - **Bilder:** valgfritt `photo`-felt per observasjon (client-side nedskalert til ~800px/JPEG q0.6,
+    kun `image/jpeg` godtas). Eget budsjett atskilt fra tekstbudsjettet: `MAX_PHOTO_BYTES` (~120 KB/bilde),
+    `MAX_TOTAL_PHOTO_BYTES` (~1,5 MB/deling), `MAX_PHOTOS_PER_SHARE` (20). Et for stort/ugyldig bilde
+    droppes stille — feller aldri hele delingen
+- `/api/share-update` (POST) → oppdaterer innholdet i en eksisterende deling (samme slug/URL),
+  krever `slug` + `deleteKey`. `expires_ts` endres bevisst ikke — forlenger ikke levetiden
 - `/api/share-delete` (POST) → trekker tilbake en deling; krever `slug` + `deleteKey`
 - `/d/<slug>` → offentlig delingsside. Ukjent og utløpt slug gir **samme** 404-side (ingen enumerering)
+- `/mine-delinger.html` → frittstående side som lister brukerens delinger fra `myShares_v1`
+  (localStorage, kun lokalt — ikke et serverendepunkt), med oppdater- og trekk tilbake-knapp per rad
 - `/stats?key=X` → displays analytics (key-protected)
 - `/health` → health check endpoint
 
@@ -113,6 +121,8 @@ The `Handler` class routes requests:
 - `share_store.py` — SQLite-lagring av delte observasjonslister (samme `stats.db`)
   - Schema: `slug, payload, display_name, delete_key, created_ts, expires_ts, views`
   - `sanitize_observations()` hviteliste-filtrerer felt — nye obs-felt lekker ikke ut ved uhell
+  - `create_share()`/`get_share()`/`update_share()`/`delete_share()`. `update_share()` overskriver
+    `payload`/`display_name`/`email` på samme rad, urørt `expires_ts`
   - Bevisst **ikke** Redis: SQLite gir persistens, backup og «utløpt»-melding gratis. Se `docs/deling-av-observasjoner-plan.md`
 - `location_db.py` — SQLite-cache for AO-lokasjoner (delt mellom containere via Docker-volum)
   - Aktiveres med `LOCATION_DB_PATH` env-var
@@ -137,12 +147,22 @@ Pure ES6 modules with no framework:
   - Skrives i `handleDirectSend` **før** «tøm lista»-spørsmålet — ellers er kvitteringen borte
   - Opprydding skjer ved lesing og skriving; ingen cron
 - `ui.js` — UI state and rendering
-- `share.js` — Deling av funn: forhåndsvisning, lenke-generering og tilbaketrekking
+- `share.js` — Deling av funn: forhåndsvisning, lenke-generering, oppdatering og tilbaketrekking
   - «Dagens funn» = **nyeste observasjonsdato i lista**, ikke kalenderdagen (viktig for etterregistrering)
   - Lagrer visningsnavn i `shareDisplayName_v1` og egne delinger i `myShares_v1`
+    (`{slug, deleteKey, ts, displayName, obsCount, dato, expiresTs}`) — samme `slug` oppdateres
+    på plass i stedet for å dupliseres. Eksporterer `hentMineDelinger()`/`glemDeling()` for
+    `mine-delinger.html`
+  - `openShareDialog(observations, existing = null)` — satt `existing` ({slug, deleteKey}) åpner
+    samme dialog i oppdater-modus mot `/api/share-update` i stedet for `/api/share`
+  - Bilder: `downscaleForShare()` lager en egen, liten delings-thumbnail (800px/JPEG q0.6) fra
+    `obs.photo` — atskilt fra den større AO-kvalitets-thumbnailen `edit.html` lager
 - `autocomplete.js` — Lokalitet-autocomplete med avstand og ikoner (🏷️ super, 👤 privat, ⭐ mine)
   - Aktivt i **begge** modi (Felt og Etterregistrering)
   - `initAutocomplete(placeInput, onSelect, getPosition)` — getPosition gir GPS-posisjon for sortering
+- `map.js` — Kartvisning (Leaflet) med brukerposisjon, AO-lokaliteter og pin-drop for ny lokasjon
+  - Kartlag: OpenStreetMap (standard), Kartverket Topo, Kartverket Gråtone — velges via `L.control.layers` nederst til venstre
+  - Kartverket-tiles er gratis WMTS uten nøkkel (`cache.kartverket.no/v1/wmts/1.0.0/{topo|topograatone}/...`)
 
 ### Konfigurerbare Aktivitetspills (v1.18.0+)
 Brukere kan velge 0-6 aktiviteter som vises som hurtigknapper:

@@ -1,7 +1,10 @@
 # Deling av observasjoner — plan
 
 **Dato:** 2026-07-27
-**Status:** Fase 1 implementert i v1.40.0 (27.07.2026). Fase 2 ikke påbegynt.
+**Status:** Fase 1 implementert i v1.40.0 (27.07.2026). Fase 2 (Mine delinger,
+oppdater eksisterende deling, bilder) implementert i v1.43.6 (10.08.2026) — se
+tillegg nederst i dokumentet. «Ikke planlagt»-punktet om bilder under er
+dermed foreldet og erstattet av tillegget.
 **Idé:** Det er gøy å dele hva man har sett. En pen, delbar oppsummering av dagens funn —
 uten å sende folk til Artsobservasjoner.
 
@@ -161,3 +164,38 @@ Kommentarer, likes, kart, bilder, følge-funksjon. Det er en annen app.
 2. **Visningsnavn: brukeren skriver det selv** én gang, lagres lokalt. AO-brukernavnet
    lekker aldri automatisk.
 3. **Levetid: 14 dager fast.** Én konstant å endre hvis det viser seg for kort.
+
+---
+
+## 7. Tillegg — Fase 2 (v1.43.6, 10.08.2026)
+
+Motivasjon: lange feltøkter (f.eks. Herdla, flere timer) der man ikke rekker å publisere
+til AO underveis — en venn med lenken bør likevel kunne se ferske funn ved å oppdatere
+siden, uten å få tilsendt en ny lenke hver gang. Samtidig var det ingen måte å se eller
+administrere egne aktive delinger på («Mine delinger» fantes ikke, bare siste deling ble
+husket, kun for øyeblikkelig «trekk tilbake»).
+
+**Bilder er nå med** — punktet om bilder under «Ikke planlagt» i §1 er dermed foreldet.
+Egen, liten delings-thumbnail (maks 800px, JPEG kvalitet 0,6) genereres client-side fra
+observasjonens eksisterende `photo`-felt (satt via `edit.html`), atskilt fra tekstbudsjettet:
+
+- `MAX_PHOTO_BYTES` (~120 KB) per bilde, `MAX_TOTAL_PHOTO_BYTES` (~1,5 MB) og
+  `MAX_PHOTOS_PER_SHARE` (20) totalt per deling. Overskridelse dropper bildet stille —
+  feller aldri hele delingen, samme prinsipp som gjelder ellers i denne planen.
+- Kun `image/jpeg` godtas (hviteliste på mime-type, ikke bare `data:image/`-prefiks) —
+  stenger blant annet ute `image/svg+xml`, som kan inneholde skript.
+- Canvas-nedskaleringen fjerner EXIF (kan inneholde GPS) som bieffekt — ingen egen
+  strippe-logikk nødvendig, men bevisst nevnt fordi det er relevant for §3 sin regel 1.
+- Brukeren ser en thumbnail + egen av/på-bryter per bilde i forhåndsvisningen (default på)
+  — konsistent med §3: «du ser nøyaktig hva som sendes».
+
+**Oppdater eksisterende deling** — ny `share_store.update_share()` og
+`POST /api/share-update`, autentisert med samme `delete_key` som ble utstedt ved
+opprettelse. Overskriver `payload`/`display_name`/`email` på samme rad; `expires_ts`
+endres bevisst ikke (en oppdatering forlenger ikke levetiden).
+
+**Mine delinger** — ny side `/mine-delinger.html`. `myShares_v1` i localStorage lagrer nå
+`{slug, deleteKey, ts, displayName, obsCount, dato, expiresTs}` (var bare
+`{slug, deleteKey, ts}`), rent lokalt — ingen nytt serverendepunkt for selve oversikten.
+Samme `slug` oppdateres på plass i stedet for å dupliseres, både ved ny deling og ved
+oppdatering.
