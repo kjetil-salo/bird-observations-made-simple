@@ -141,23 +141,10 @@
     </div>
 
     <script type="module">
-      import { loadMedobs, saveMedobs } from './js/storage.js';
+      import { loadMedobs, saveMedobs, loadObservations, saveObservations, lastSaveError } from './js/storage.js';
 
-      const STORAGE_KEY = 'fugleobservasjoner_v1';
-      function getObservations() {
-        try {
-          const raw = window.localStorage.getItem(STORAGE_KEY);
-          if (!raw) return [];
-          const payload = JSON.parse(raw);
-          if (!payload || !Array.isArray(payload.observations)) return [];
-          return payload.observations;
-        } catch (e) { console.warn('Feil ved lesing av localStorage', e); return []; }
-      }
-      function saveObservations(arr) {
-        try {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, observations: arr }));
-        } catch (e) { console.warn('Kunne ikke lagre', e); }
-      }
+      // Alias — resten av filen kaller getObservations(), samme kontrakt som loadObservations().
+      const getObservations = loadObservations;
 
       function qs(name) {
         const params = new URLSearchParams(window.location.search);
@@ -663,7 +650,9 @@
           }
         }
         if (!lagret) {
-          alert('Kunne ikke lagre endringene — enheten har trolig ikke nok ledig lagringsplass. Prøv å tømme noen gamle observasjoner eller last ned en sikkerhetskopi og forsøk igjen.');
+          alert('Kunne ikke lagre endringene — enheten har trolig ikke nok ledig lagringsplass. '
+            + 'Prøv å tømme noen gamle observasjoner eller last ned en sikkerhetskopi og forsøk igjen.'
+            + (lastSaveError ? `\n\n(${lastSaveError})` : ''));
           return;
         }
 

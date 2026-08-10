@@ -8,6 +8,15 @@ const AO_SIZE_KEY = 'ao_search_radius_v1';
 const ACTIVITY_PILLS_KEY = 'activityPills_v1';
 const SENT_KEY = 'sent_observations_v1';
 
+/**
+ * Teknisk beskrivelse av siste feilede saveObservations()-kall (f.eks.
+ * "QuotaExceededError: ..."). Rent diagnostisk — vises i feilmeldingen i
+ * edit.html slik at en feilmelding ikke feilaktig peker på full lagrings-
+ * plass når den egentlige årsaken er noe annet (f.eks. et felt som ikke lar
+ * seg JSON-serialisere).
+ */
+export let lastSaveError = null;
+
 // Sendt-loggen husker hva som faktisk ble sendt, slik at arbeidslista trygt kan
 // tømmes etterpå. Holdes bevisst kort — den er en kvittering, ikke et arkiv.
 export const SENT_MAX_DAYS = 7;
@@ -98,8 +107,10 @@ export function saveObservations(observations) {
       observations,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    lastSaveError = null;
     return true;
   } catch (e) {
+    lastSaveError = `${e.name || 'Feil'}: ${e.message || e}`;
     console.warn('Kunne ikke lagre til localStorage', e);
     return false;
   }

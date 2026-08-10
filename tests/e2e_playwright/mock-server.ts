@@ -241,6 +241,13 @@ const server = http.createServer((req, res) => {
   // Serve statiske filer fra public/
   const publicDir = path.join(__dirname, '..', '..', 'public');
   let filePath = pathname === '/' ? '/index.html' : pathname;
+  // server.py sin translate_path() strekker /public/-prefikset til å peke inn
+  // i public/-katalogen (så f.eks. window.location.href = '/public/edit.html'
+  // fungerer i den ekte appen) — gjenta samme mapping her, ellers 404 mock-
+  // serveren på nøyaktig de URL-ene appen selv navigerer til.
+  if (filePath.startsWith('/public/')) {
+    filePath = filePath.slice('/public'.length);
+  }
   const fullPath = path.join(publicDir, filePath);
 
   // Sikkerhetsjekk: ikke tillat path traversal
