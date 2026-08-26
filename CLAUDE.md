@@ -141,6 +141,10 @@ Pure ES6 modules with no framework:
 - `api.js` — API communication with 1-hour species cache
 - `location.js` — Geolocation and AO sites integration
 - `observations.js` — Main observation form logic
+  - Gruppeoverskriften i ③ har tre knapper: ✏️ (bytt aktiv lokalitet), 🔒 (lås besøk), 🕐 (sett klokkeslett)
+  - ✏️ eier ikke `appState` og sender derfor `CustomEvent('obs:bruk-lokalitet', {detail:{placeName, placeId}})`
+    på `document`. Lytteren i `main.js` setter `currentPlaceName`/`currentPlaceId`, kollapser ① og
+    fokuserer art-feltet. Nye obser havner i samme besøk hvis det er åpent (`resolveVisitIdForNewObservation`)
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
   - `saveObservations()` returnerer `true`/`false` for om `localStorage.setItem()` faktisk

@@ -6,7 +6,7 @@
 // Eksisterende moduler
 import { logPageView, loadActivities, fetchAoSites, fetchAndCachePrivateSites, getCachedPrivateSites } from './api.js';
 import { loadObservations, saveObservations, loadAoSearchRadius, saveAoSearchRadius } from './storage.js';
-import { setStatus, setLocationStatus } from './ui.js';
+import { setStatus, setLocationStatus, showToast } from './ui.js';
 import { setAoSiteSuggestions, initLocation, openMap, openMapPage, updateCreateSiteBtnVisibility, initCreateSite } from './location.js';
 import { renderObservations } from './observations.js';
 
@@ -208,6 +208,27 @@ function setupEventListeners() {
   const locPinnedLabel = document.getElementById('loc-pinned-label');
   if (locChangeBtn) locChangeBtn.addEventListener('click', expandLocation);
   if (locPinnedLabel) locPinnedLabel.addEventListener('click', expandLocation);
+
+  // Blyant i gruppeoverskrifta i ③: bytt aktiv lokalitet tilbake til den
+  // gruppens sted, uten å måtte søke det opp på nytt. Observasjons-modulen
+  // eier ikke appState, så den varsler hit via CustomEvent.
+  document.addEventListener('obs:bruk-lokalitet', (e) => {
+    const placeName = (e.detail && e.detail.placeName || '').trim();
+    if (!placeName) return;
+    appState.currentPlaceName = placeName;
+    appState.currentPlaceId = (e.detail && e.detail.placeId) || null;
+    if (dom.placeInput) {
+      dom.placeInput.value = placeName;
+      dom.placeInput.dataset.autofilled = 'true';
+    }
+    updateSectionStates(appState, dom);
+    collapseLocation();
+    // Brukeren står nede i obs-lista når hen trykker — ta hen tilbake til
+    // toppen der art-feltet står, ellers ser det ut som ingenting skjedde.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`Aktiv lokalitet: ${placeName}`, { raw: true });
+    pulseSearchFieldAndFocus(appState, dom);
+  });
 
   const includeSubtaxaCheckbox = document.getElementById('include-subtaxa');
   if (includeSubtaxaCheckbox) {

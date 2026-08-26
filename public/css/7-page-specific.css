@@ -1086,7 +1086,8 @@ body.theme-light #search:disabled::placeholder {
       }
 
       .obs-group-lock-btn,
-      .obs-group-time-btn {
+      .obs-group-time-btn,
+      .obs-group-place-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1124,14 +1125,16 @@ body.theme-light #search:disabled::placeholder {
       /* Klokka fikk anonym grå kant ved siden av den kraftige lås-badgen.
          Gi den appens aksentfarge (blå) så den leser som en tydelig,
          likeverdig handlingsknapp – uten å stjele lås-badgens statusfarger. */
-      .obs-group-time-btn {
+      .obs-group-time-btn,
+      .obs-group-place-btn {
         border-color: rgba(59, 130, 246, 0.60);
         background: rgba(59, 130, 246, 0.14);
         color: var(--accent);
         opacity: 1;
       }
 
-      .obs-group-time-btn:hover {
+      .obs-group-time-btn:hover,
+      .obs-group-place-btn:hover {
         opacity: 1;
         border-color: var(--accent);
         background: var(--accent-soft);
@@ -1928,12 +1931,14 @@ body.theme-light .obs-group-meta {
 }
 
 body.theme-light .obs-group-lock-btn,
-body.theme-light .obs-group-time-btn {
+body.theme-light .obs-group-time-btn,
+body.theme-light .obs-group-place-btn {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
 }
 
-body.theme-light .obs-group-time-btn {
+body.theme-light .obs-group-time-btn,
+body.theme-light .obs-group-place-btn {
   background: rgba(37, 99, 235, 0.10) !important;
   border-color: rgba(37, 99, 235, 0.60) !important;
   color: #1d4ed8 !important;
@@ -2156,7 +2161,8 @@ body.theme-clean .obs-group-meta {
   color: #111111 !important;
 }
 
-body.theme-clean .obs-group-time-btn {
+body.theme-clean .obs-group-time-btn,
+body.theme-clean .obs-group-place-btn {
   background: rgba(0, 0, 0, 0.06) !important;
   border-color: rgba(0, 0, 0, 0.45) !important;
   color: #111111 !important;
