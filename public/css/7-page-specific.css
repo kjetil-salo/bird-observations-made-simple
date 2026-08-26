@@ -2300,6 +2300,19 @@ body.theme-clean .loc-pinned {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* «↩ 17:09–17:18» — viser at nye arter går inn i et tidligere besøk og hvilket
+   klokkeslett de arver. Dempet, men aldri avkortet: tida er poenget. */
+.loc-pinned-visit {
+  flex-shrink: 0;
+  font-size: 0.78em;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .loc-change-btn {
   flex-shrink: 0;
   background: var(--accent-soft);

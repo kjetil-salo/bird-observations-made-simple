@@ -9,6 +9,7 @@ import { loadObservations, saveObservations, loadAoSearchRadius, saveAoSearchRad
 import { setStatus, setLocationStatus, showToast } from './ui.js';
 import { setAoSiteSuggestions, initLocation, openMap, openMapPage, updateCreateSiteBtnVisibility, initCreateSite } from './location.js';
 import { renderObservations } from './observations.js';
+import { getVisitTimeSpan, isVisitLocked, visitExists } from './visits.js';
 
 // Nye moduler
 import { updateSectionStates, pulseSearchFieldAndFocus } from './form-state.js';
@@ -33,6 +34,11 @@ const appState = {
   currentPosition: null,
   currentPlaceName: '',
   currentPlaceId: null,
+  // Satt når man hopper tilbake til et besøk med blyanten i ③. Da er nye
+  // observasjoner etterregistreringer *inni* det besøket, og arver besøkets
+  // klokkeslett i stedet for å få «nå». Nullstilles så snart plassen endres
+  // på en hvilken som helst annen måte.
+  etterregVisitKey: null,
   currentAoSites: [],
   currentAoSizeMeters: 1000,
   _callbacks: null, // settes i init()
@@ -99,6 +105,17 @@ function saveState() {
   saveObservations(appState.observations);
 }
 
+/**
+ * Forlat etterregistrerings-modus for et besøk. Kalles fra alle steder som
+ * setter aktiv plass på annen måte enn blyanten — GPS-dropdown, autocomplete,
+ * kartvalg og manuell skriving. Da er man ikke lenger i det gamle besøket.
+ */
+function avsluttEtterregistrering() {
+  if (!appState.etterregVisitKey) return;
+  appState.etterregVisitKey = null;
+  oppdaterEtterregMerke();
+}
+
 function loadState() {
   const loaded = loadObservations();
   appState.observations.splice(0, appState.observations.length);
@@ -118,6 +135,8 @@ function loadState() {
 function doRenderObservations() {
   const buttons = { exportBtn: dom.exportBtn, copyBtn: dom.copyBtn, copyOpenBtn: dom.copyOpenBtn, shareBtn: dom.shareBtn, clearBtn: dom.clearBtn, aoDirectBtn: dom.aoDirectBtn };
   renderObservations(appState.observations, dom.obsListEl, buttons, saveState);
+  // Lista kan ha endret besøket vi etterregistrerer i (låst, tømt, nye tider)
+  oppdaterEtterregMerke();
 }
 
 function updateAoDirectVisibility() {
@@ -157,7 +176,53 @@ function collapseLocation() {
   if (sectionLokasjon) sectionLokasjon.style.display = 'none';
 }
 
+function klokke(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * Merket i den festede lokasjonslinja som viser at nye observasjoner går inn
+ * i et tidligere besøk, og hvilket klokkeslett de får. Uten dette ville tida
+ * bli satt stille i bakgrunnen — brukeren skal se hva som skjer.
+ */
+function oppdaterEtterregMerke() {
+  const merke = document.getElementById('loc-pinned-visit');
+  if (!merke) return;
+
+  // Besøket kan ha blitt tømt (slettede obser, «tøm lista») siden ↩ ble
+  // trykket. Da finnes det ikke lenger å gå tilbake til. Et *låst* besøk
+  // beholdes derimot — ↩ er nettopp et eksplisitt valg om å gå inn i det.
+  if (appState.etterregVisitKey
+      && !visitExists(appState.observations, appState.etterregVisitKey)) {
+    appState.etterregVisitKey = null;
+  }
+
+  const span = appState.etterregVisitKey
+    ? getVisitTimeSpan(appState.observations, appState.etterregVisitKey)
+    : null;
+
+  if (!span) {
+    merke.style.display = 'none';
+    merke.textContent = '';
+    return;
+  }
+
+  // Nye arter får besøkets starttidspunkt — ett nøyaktig klokkeslett. Merket
+  // viser akkurat det tallet, så tida aldri settes i det skjulte.
+  const laast = isVisitLocked(appState.observations, appState.etterregVisitKey);
+  merke.textContent = `${laast ? '🔒 ' : ''}↩ ${klokke(span.fra)}`;
+  merke.title = laast
+    ? 'Avsluttet besøk. Nye arter legges likevel inn her, med besøkets klokkeslett.'
+    : 'Nye arter legges inn i dette besøket og får dette klokkeslettet';
+  merke.style.display = '';
+}
+
 function expandLocation() {
+  // Åpner man ① for å bytte plass, er man ute av etterregistreringen — det er
+  // den enkle veien tilbake til vanlig «nå»-registrering på samme lokalitet.
+  avsluttEtterregistrering();
   const locPinned = document.getElementById('loc-pinned');
   const sectionLokasjon = document.querySelector('.section-lokasjon');
   if (locPinned) locPinned.style.display = 'none';
@@ -174,6 +239,7 @@ function handlePositionUpdate(position, sites) {
   appState.currentPosition = position;
 
   function setCurrentPlaceAndUpdate(name, siteId = null) {
+    avsluttEtterregistrering();
     appState.currentPlaceName = name;
     appState.currentPlaceId = siteId;
     if (dom.placeInput) {
@@ -221,12 +287,32 @@ function setupEventListeners() {
       dom.placeInput.value = placeName;
       dom.placeInput.dataset.autofilled = 'true';
     }
+    // Å gå tilbake hit er en etterregistrering inn i besøket, ikke noe man ser
+    // nå: nye arter får besøkets starttidspunkt (se observation-commit.js).
+    // Vil man registrere et *nytt* besøk på samme sted, velger man lokaliteten
+    // på vanlig måte i ① i stedet — da blir tida «nå».
+    appState.etterregVisitKey = (e.detail && e.detail.visitKey) || null;
     updateSectionStates(appState, dom);
     collapseLocation();
+    oppdaterEtterregMerke();
     // Brukeren står nede i obs-lista når hen trykker — ta hen tilbake til
     // toppen der art-feltet står, ellers ser det ut som ingenting skjedde.
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(`Aktiv lokalitet: ${placeName}`, { raw: true });
+    const span = appState.etterregVisitKey
+      ? getVisitTimeSpan(appState.observations, appState.etterregVisitKey)
+      : null;
+    const tid = span ? klokke(span.fra) : '';
+    // Lett advarsel ved låst besøk: brukeren har selv sagt at besøket er
+    // avsluttet, så det skal ikke være stille at nye arter havner der — og
+    // enda mindre at klokka settes tilbake i tid. Ikke-blokkerende med vilje.
+    if (e.detail && e.detail.visitLocked) {
+      showToast(
+        `↩ ${placeName} — avsluttet besøk. Nye arter får kl. ${tid}, tilbake i tid.`,
+        { raw: true, borderColor: '#f59e0b', duration: 3500 }
+      );
+    } else {
+      showToast(`↩ ${placeName}${tid ? ` — nye arter får kl. ${tid}` : ''}`, { raw: true });
+    }
     pulseSearchFieldAndFocus(appState, dom);
   });
 
@@ -240,6 +326,7 @@ function setupEventListeners() {
   if (dom.placeInput) {
     dom.placeInput.addEventListener('input', () => {
       // Manuell redigering fjerner alltid ID — ID kjem berre frå dropdown-val
+      avsluttEtterregistrering();
       appState.currentPlaceId = null;
       dom.placeInput.dataset.autofilled = 'false';
       appState.currentPlaceName = dom.placeInput.value;
@@ -416,6 +503,7 @@ async function init() {
   // Sjekk om bruker har valgt lokalitet fra kartet
   const selectedLocation = localStorage.getItem('selectedLocation');
   if (selectedLocation) {
+    avsluttEtterregistrering();
     appState.currentPlaceName = selectedLocation;
     const selectedLocationId = localStorage.getItem('selectedLocationId');
     appState.currentPlaceId = selectedLocationId ? parseInt(selectedLocationId, 10) || selectedLocationId : null;
@@ -433,6 +521,7 @@ async function init() {
     autocompleteCleanup = initAutocomplete(
       dom.placeInput,
       (name, id) => {
+        avsluttEtterregistrering();
         appState.currentPlaceName = name;
         appState.currentPlaceId = id;
         dom.placeInput.dataset.autofilled = 'true';

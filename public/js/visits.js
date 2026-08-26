@@ -63,3 +63,56 @@ export function setVisitLocked(observations, visitKey, locked = true) {
   }
   return count;
 }
+
+/**
+ * Tidsspennet til et besøk: tidligste fra-tid og seneste til-tid blant
+ * observasjonene i besøket. Samme regnestykke som gruppeoverskrifta i ③
+ * viser, men returnert som lokale ISO-strenger klare til å settes på en ny obs.
+ *
+ * Brukes når man hopper tilbake til et besøk med blyanten: da er den nye
+ * observasjonen en etterregistrering *inni* besøket, ikke noe man så nå.
+ *
+ * @returns {{fra: string, til: string|null}|null} null hvis besøket er tomt
+ *   eller ingen av observasjonene har brukbart tidspunkt.
+ */
+export function getVisitTimeSpan(observations, visitKey) {
+  // Sammenlign på parset tid, ikke på streng: lista kan inneholde både
+  // «2026-08-26T17:09:00» (toLocalISOString) og eldre UTC-strenger med Z,
+  // og de sorterer ikke likt leksikografisk.
+  let fra = null, fraMs = Infinity;
+  let til = null, tilMs = -Infinity;
+
+  // kanVaereFra: bare fra-tidspunkter kan flytte starten på besøket — samme
+  // regnestykke som gruppeoverskrifta i ③ gjør.
+  const vurder = (verdi, kanVaereFra) => {
+    if (!verdi) return;
+    const ms = new Date(verdi).getTime();
+    if (isNaN(ms)) return;
+    if (kanVaereFra && ms < fraMs) { fraMs = ms; fra = verdi; }
+    if (ms > tilMs) { tilMs = ms; til = verdi; }
+  };
+
+  for (const obs of observations || []) {
+    if (getObservationVisitKey(obs) !== visitKey) continue;
+    vurder(obs.timestamp, true);
+    vurder(obs.tilKlokkeslett, false);
+  }
+
+  if (fra === null) return null;
+  return { fra, til: tilMs > fraMs ? til : null };
+}
+
+/**
+ * Er besøket avsluttet (🔒)? Et besøk er låst når alle observasjonene i det er
+ * det — samme regnestykke som gruppeoverskrifta i ③ bruker.
+ */
+export function isVisitLocked(observations, visitKey) {
+  const iBesoket = (observations || []).filter(
+    (o) => getObservationVisitKey(o) === visitKey);
+  return iBesoket.length > 0 && iBesoket.every((o) => o.visitLocked);
+}
+
+/** Finnes besøket fortsatt i lista? */
+export function visitExists(observations, visitKey) {
+  return (observations || []).some((o) => getObservationVisitKey(o) === visitKey);
+}

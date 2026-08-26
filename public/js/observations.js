@@ -252,24 +252,31 @@ export function renderObservations(observations, obsListEl, buttons, saveState) 
     const groupActions = document.createElement('div');
     groupActions.className = 'obs-group-actions';
 
-    // Blyant: gjør denne gruppens lokalitet til aktiv lokalitet igjen, slik at
-    // brukeren kan legge inn flere obser her uten å søke opp stedet på nytt.
+    // ↩ «Gå tilbake til dette besøket»: nye arter havner i akkurat dette
+    // besøket, med besøkets starttidspunkt. Ikke blyant — ✏️ betyr allerede
+    // «rediger denne observasjonen» på hver rad rett under, og ikke pluss —
+    // + er opptatt av antallsknappene. Tilbake-pila sier hva det faktisk er.
     // Selve byttet gjøres i main.js (som eier appState) via CustomEvent.
     const groupPlaceName = (group.items[0] && group.items[0].placeName || '').trim();
     if (groupPlaceName) {
       const usePlaceBtn = document.createElement('button');
       usePlaceBtn.type = 'button';
-      // Egen blyant-SVG (samme strekstil som klokka) i stedet for ✏️-emojien
-      // radene bruker — den hører til handlingsknappene i overskrifta.
-      usePlaceBtn.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.4 3.9a2.1 2.1 0 0 1 3 3L8.5 17.8l-4 1 1-4z"/><path d="M14.2 6.1l3.7 3.7"/></svg>';
-      usePlaceBtn.setAttribute('aria-label', `Fortsett registrering på ${groupPlaceName}`);
-      usePlaceBtn.title = `Sett ${groupPlaceName} som aktiv lokalitet og legg inn flere arter her`;
+      usePlaceBtn.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 5 5v4"/></svg>';
+      usePlaceBtn.setAttribute('aria-label', `Gå tilbake til besøket på ${groupPlaceName}`);
+      usePlaceBtn.title = visitLocked
+        ? `Gå tilbake til dette avsluttede besøket på ${groupPlaceName} — nye arter får besøkets klokkeslett`
+        : `Gå tilbake til dette besøket på ${groupPlaceName} og legg inn flere arter`;
       usePlaceBtn.className = 'obs-group-place-btn';
       const groupPlaceId = group.items[0].placeId || null;
       usePlaceBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         document.dispatchEvent(new CustomEvent('obs:bruk-lokalitet', {
-          detail: { placeName: groupPlaceName, placeId: groupPlaceId },
+          detail: {
+            placeName: groupPlaceName,
+            placeId: groupPlaceId,
+            visitKey: group.visitKey,
+            visitLocked,
+          },
         }));
       });
       groupActions.appendChild(usePlaceBtn);

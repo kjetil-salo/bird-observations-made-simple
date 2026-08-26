@@ -141,10 +141,21 @@ Pure ES6 modules with no framework:
 - `api.js` — API communication with 1-hour species cache
 - `location.js` — Geolocation and AO sites integration
 - `observations.js` — Main observation form logic
-  - Gruppeoverskriften i ③ har tre knapper: ✏️ (bytt aktiv lokalitet), 🔒 (lås besøk), 🕐 (sett klokkeslett)
-  - ✏️ eier ikke `appState` og sender derfor `CustomEvent('obs:bruk-lokalitet', {detail:{placeName, placeId}})`
-    på `document`. Lytteren i `main.js` setter `currentPlaceName`/`currentPlaceId`, kollapser ① og
-    fokuserer art-feltet. Nye obser havner i samme besøk hvis det er åpent (`resolveVisitIdForNewObservation`)
+  - Gruppeoverskriften i ③ har tre knapper: ↩ (tilbake til besøket), 🔒 (lås besøk), 🕐 (sett klokkeslett)
+  - **↩ = «gå tilbake til akkurat dette besøket»**, ikke bare «bytt lokalitet». Modulen eier ikke
+    `appState` og sender `CustomEvent('obs:bruk-lokalitet', {detail:{placeName, placeId, visitKey,
+    visitLocked}})` på `document`. Lytteren i `main.js` setter `currentPlaceName`/`currentPlaceId`
+    **og `etterregVisitKey`**, kollapser ① og fokuserer art-feltet
+  - Så lenge `etterregVisitKey` er satt, hopper `observation-commit.js` over
+    `resolveVisitIdForNewObservation`: obsen får det besøkets `visitId`, besøkets **starttidspunkt**
+    (`getVisitTimeSpan().fra` — ett nøyaktig klokkeslett, aldri `tilKlokkeslett`) og besøkets
+    `visitLocked`. Uten arvet lås ville et låst besøk stille låse seg opp igjen (gruppa regnes som
+    låst bare når *alle* obsene i den er det)
+  - `etterregVisitKey` nullstilles av `avsluttEtterregistrering()` fra alle andre måter å sette plass
+    på (GPS-dropdown, autocomplete, kartvalg, manuell skriving) og fra `expandLocation()` —
+    «Bytt plass» er den synlige veien tilbake til «nå»-registrering
+  - Merket `#loc-pinned-visit` i den festede lokasjonslinja viser klokkeslettet man får («↩ 17:09»,
+    «🔒 ↩ 17:09» for låst besøk). Tida skal aldri settes i det skjulte
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
   - `saveObservations()` returnerer `true`/`false` for om `localStorage.setItem()` faktisk

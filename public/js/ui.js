@@ -30,9 +30,10 @@ export function flashButton(button, successLabel) {
  * @param {Function} options.onUndo - Callback for undo-knapp
  * @param {number} options.duration - Varighet i ms (default: 1500)
  * @param {boolean} options.raw - Vis meldingen uten automatisk "registrert"-suffix
+ * @param {string} options.borderColor - Overstyr rammefargen (f.eks. advarsel)
  */
 export function showToast(msg, options = {}) {
-  const { onUndo, duration = 1500, raw = false } = options;
+  const { onUndo, duration = 1500, raw = false, borderColor = null } = options;
 
   let toast = document.getElementById('registered-toast');
   if (!toast) {
@@ -78,6 +79,8 @@ export function showToast(msg, options = {}) {
     textSpan.textContent = `${msg} registrert`;
     toast.style.borderColor = '#22c55e';
   }
+  // Lar kalleren markere en advarsel (gul) uten å måtte gjette på tekstprefiks
+  if (borderColor) toast.style.borderColor = borderColor;
   toast.appendChild(textSpan);
 
   // Legg til undo-knapp hvis onUndo er gitt

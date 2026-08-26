@@ -5,7 +5,7 @@
 import { defaultCoObservers, loadActivityPills } from './storage.js';
 import { showToast } from './ui.js';
 import { toLocalISOString } from './utils.js';
-import { resolveVisitIdForNewObservation } from './visits.js';
+import { resolveVisitIdForNewObservation, getVisitTimeSpan, isVisitLocked, visitExists } from './visits.js';
 
 function getObservationTimestamp() {
   const isAfterMode = localStorage.getItem('afterRegistrationMode') === '1';
@@ -110,16 +110,44 @@ export function commitObservation(state, dom, callbacks) {
   const isAfterMode = localStorage.getItem('afterRegistrationMode') === '1';
   const now = new Date();
 
-  const timestamp = getObservationTimestamp();
+  let timestamp = getObservationTimestamp();
   if (isAfterMode && new Date(timestamp) > now) {
     showToast('Fra-tidspunkt er frem i tid — AO underkjenner observasjonen');
     return;
   }
 
-  const tilKlokkeslett = getObservationTimestampTo();
+  let tilKlokkeslett = getObservationTimestampTo();
   if (tilKlokkeslett && new Date(tilKlokkeslett) > now) {
     showToast('Til-tidspunkt er frem i tid — AO underkjenner observasjonen');
     return;
+  }
+
+  // «Gå tilbake til dette besøket» (↩ i gruppeoverskrifta i ③): observasjonen
+  // hører hjemme i akkurat det besøket, ikke i et nytt. Den får besøkets
+  // starttidspunkt — ett nøyaktig klokkeslett, ikke et intervall. Vil man
+  // siden samkjøre tidene for hele besøket, er 🕐 fortsatt verktøyet for det.
+  //
+  // Dette overstyrer bevisst låsen: 🔒 hindrer at nye observasjoner *automatisk*
+  // havner i et avsluttet besøk, men ↩ er et eksplisitt valg om nettopp det.
+  // Da må obsen også arve låsen, ellers ville gruppa stille låse seg opp igjen
+  // (gruppa regnes som låst bare når alle obsene i den er det).
+  const etterreg = state.etterregVisitKey
+    && visitExists(state.observations, state.etterregVisitKey);
+
+  let visitId;
+  let visitLocked = false;
+
+  if (etterreg) {
+    visitId = state.etterregVisitKey;
+    visitLocked = isVisitLocked(state.observations, visitId);
+    const span = getVisitTimeSpan(state.observations, visitId);
+    if (span) {
+      timestamp = span.fra;
+      tilKlokkeslett = null;
+    }
+  } else {
+    visitId = resolveVisitIdForNewObservation(
+      state.observations, place, state.currentPlaceId || null, new Date(timestamp));
   }
 
   const obs = {
@@ -129,8 +157,8 @@ export function commitObservation(state, dom, callbacks) {
     activity,
     placeName: place,
     placeId: state.currentPlaceId || null,
-    visitId: resolveVisitIdForNewObservation(state.observations, place, state.currentPlaceId || null, new Date(timestamp)),
-    visitLocked: false,
+    visitId,
+    visitLocked,
     timestamp,
     age,
     gender,
