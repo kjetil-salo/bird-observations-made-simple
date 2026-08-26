@@ -111,21 +111,12 @@ export function commitObservation(state, dom, callbacks) {
   const now = new Date();
 
   let timestamp = getObservationTimestamp();
-  if (isAfterMode && new Date(timestamp) > now) {
-    showToast('Fra-tidspunkt er frem i tid — AO underkjenner observasjonen');
-    return;
-  }
-
   let tilKlokkeslett = getObservationTimestampTo();
-  if (tilKlokkeslett && new Date(tilKlokkeslett) > now) {
-    showToast('Til-tidspunkt er frem i tid — AO underkjenner observasjonen');
-    return;
-  }
 
   // «Gå tilbake til dette besøket» (↩ i gruppeoverskrifta i ③): observasjonen
-  // hører hjemme i akkurat det besøket, ikke i et nytt. Den får besøkets
-  // starttidspunkt — ett nøyaktig klokkeslett, ikke et intervall. Vil man
-  // siden samkjøre tidene for hele besøket, er 🕐 fortsatt verktøyet for det.
+  // hører hjemme i akkurat det besøket, ikke i et nytt. Den arver besøkets
+  // tidsspenn (fra–til), fordi man vet at arten ble sett i løpet av besøket,
+  // ikke nøyaktig når. Er besøket ett enkelt tidspunkt, blir det ingen til-tid.
   //
   // Dette overstyrer bevisst låsen: 🔒 hindrer at nye observasjoner *automatisk*
   // havner i et avsluttet besøk, men ↩ er et eksplisitt valg om nettopp det.
@@ -143,11 +134,23 @@ export function commitObservation(state, dom, callbacks) {
     const span = getVisitTimeSpan(state.observations, visitId);
     if (span) {
       timestamp = span.fra;
-      tilKlokkeslett = null;
+      tilKlokkeslett = span.til;
     }
   } else {
     visitId = resolveVisitIdForNewObservation(
       state.observations, place, state.currentPlaceId || null, new Date(timestamp));
+  }
+
+  // Valider tidene som faktisk blir lagret — ikke skjemaets. Sto klokka i
+  // skjemaet frem i tid mens man etterregistrerte inn i et besøk, ble
+  // registreringen ellers avvist for en tid som aldri kom til å bli brukt.
+  if (isAfterMode && new Date(timestamp) > now) {
+    showToast('Fra-tidspunkt er frem i tid — AO underkjenner observasjonen');
+    return;
+  }
+  if (tilKlokkeslett && new Date(tilKlokkeslett) > now) {
+    showToast('Til-tidspunkt er frem i tid — AO underkjenner observasjonen');
+    return;
   }
 
   const obs = {

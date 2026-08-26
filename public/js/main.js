@@ -176,6 +176,14 @@ function collapseLocation() {
   if (sectionLokasjon) sectionLokasjon.style.display = 'none';
 }
 
+/** Besøkets tidsspenn som «17:09–17:18», eller «17:09» hvis det er ett punkt. */
+function visittid(span) {
+  if (!span) return '';
+  const fra = klokke(span.fra);
+  const til = span.til ? klokke(span.til) : '';
+  return til && til !== fra ? `${fra}–${til}` : fra;
+}
+
 function klokke(iso) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
@@ -209,10 +217,10 @@ function oppdaterEtterregMerke() {
     return;
   }
 
-  // Nye arter får besøkets starttidspunkt — ett nøyaktig klokkeslett. Merket
-  // viser akkurat det tallet, så tida aldri settes i det skjulte.
+  // Nye arter arver besøkets tidsspenn. Merket viser akkurat de klokkeslettene,
+  // så tida aldri settes i det skjulte.
   const laast = isVisitLocked(appState.observations, appState.etterregVisitKey);
-  merke.textContent = `${laast ? '🔒 ' : ''}↩ ${klokke(span.fra)}`;
+  merke.textContent = `${laast ? '🔒 ' : ''}↩ ${visittid(span)}`;
   merke.title = laast
     ? 'Avsluttet besøk. Nye arter legges likevel inn her, med besøkets klokkeslett.'
     : 'Nye arter legges inn i dette besøket og får dette klokkeslettet';
@@ -301,7 +309,7 @@ function setupEventListeners() {
     const span = appState.etterregVisitKey
       ? getVisitTimeSpan(appState.observations, appState.etterregVisitKey)
       : null;
-    const tid = span ? klokke(span.fra) : '';
+    const tid = visittid(span);
     // Lett advarsel ved låst besøk: brukeren har selv sagt at besøket er
     // avsluttet, så det skal ikke være stille at nye arter havner der — og
     // enda mindre at klokka settes tilbake i tid. Ikke-blokkerende med vilje.

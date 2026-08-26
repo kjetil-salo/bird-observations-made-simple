@@ -147,15 +147,18 @@ Pure ES6 modules with no framework:
     visitLocked}})` på `document`. Lytteren i `main.js` setter `currentPlaceName`/`currentPlaceId`
     **og `etterregVisitKey`**, kollapser ① og fokuserer art-feltet
   - Så lenge `etterregVisitKey` er satt, hopper `observation-commit.js` over
-    `resolveVisitIdForNewObservation`: obsen får det besøkets `visitId`, besøkets **starttidspunkt**
-    (`getVisitTimeSpan().fra` — ett nøyaktig klokkeslett, aldri `tilKlokkeslett`) og besøkets
-    `visitLocked`. Uten arvet lås ville et låst besøk stille låse seg opp igjen (gruppa regnes som
-    låst bare når *alle* obsene i den er det)
+    `resolveVisitIdForNewObservation`: obsen får det besøkets `visitId`, besøkets **tidsspenn**
+    (`getVisitTimeSpan()` → `timestamp`=fra, `tilKlokkeslett`=til) og besøkets `visitLocked`.
+    Man vet at arten ble sett i løpet av besøket, ikke nøyaktig når. Uten arvet lås ville et låst
+    besøk stille låse seg opp igjen (gruppa regnes som låst bare når *alle* obsene i den er det)
+  - **Fremtids-valideringen kjører etter overstyringen**, ikke før: det er tidene som faktisk lagres
+    som skal valideres. Sto skjemaets klokke frem i tid i etterregistreringsmodus, ble ↩-registreringen
+    ellers avvist for en tid som aldri kom til å bli brukt
   - `etterregVisitKey` nullstilles av `avsluttEtterregistrering()` fra alle andre måter å sette plass
     på (GPS-dropdown, autocomplete, kartvalg, manuell skriving) og fra `expandLocation()` —
     «Bytt plass» er den synlige veien tilbake til «nå»-registrering
-  - Merket `#loc-pinned-visit` i den festede lokasjonslinja viser klokkeslettet man får («↩ 17:09»,
-    «🔒 ↩ 17:09» for låst besøk). Tida skal aldri settes i det skjulte
+  - Merket `#loc-pinned-visit` i den festede lokasjonslinja viser tidsspennet man får («↩ 17:09–17:18»,
+    «🔒 ↩ 17:09» for låst besøk / ett tidspunkt). Tida skal aldri settes i det skjulte
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
   - `saveObservations()` returnerer `true`/`false` for om `localStorage.setItem()` faktisk
