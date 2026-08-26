@@ -159,6 +159,8 @@ Pure ES6 modules with no framework:
     «Bytt plass» er den synlige veien tilbake til «nå»-registrering
   - Merket `#loc-pinned-visit` i den festede lokasjonslinja viser tidsspennet man får («↩ 17:09–17:18»,
     «🔒 ↩ 17:09» for låst besøk / ett tidspunkt). Tida skal aldri settes i det skjulte
+  - **Full beskrivelse:** `docs/besok-og-tilbake-til-besok.md` (begrepet besøk, tidsregelen,
+    fallgruver, testdekning)
 - `observation-commit.js` — Observation validation and activity pills rendering
 - `storage.js` — Browser localStorage management (includes activity pills config)
   - `saveObservations()` returnerer `true`/`false` for om `localStorage.setItem()` faktisk
