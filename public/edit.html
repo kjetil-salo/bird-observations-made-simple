@@ -642,11 +642,25 @@
         // forsvant bildet i stillhet: setItem kastet, siden navigerte videre
         // som om alt var lagret, og bildet var borte neste gang man så etter.
         if (!lagret && obs.photo) {
-          delete obs.photo;
-          observations[idx] = obs;
-          lagret = saveObservations(observations);
-          if (lagret) {
-            alert('Bildet var for stort til å lagres på denne enheten (tom lagringsplass). Resten av endringene er lagret, men uten bildet.');
+          // Bare et bilde brukeren nettopp la til kan kastes automatisk — det
+          // er da rimelig sikkert at det er dette som sprenger kvoten. Var
+          // bildet der fra før (photoDataUrl === null = urørt), kan kvoten
+          // like gjerne være full av andre observasjoners bilder, og da skal
+          // vi ikke slette et bilde brukeren ikke har rørt uten å spørre.
+          const nyttBilde = typeof photoDataUrl === 'string' && photoDataUrl !== '';
+          const kastBildet = nyttBilde || confirm(
+            'Det er ikke plass til å lagre endringene på denne enheten.\n\n'
+            + 'Vil du fjerne bildet fra denne observasjonen for å få plass? Bildet er da borte for godt.\n\n'
+            + 'Trykk Avbryt hvis du heller vil frigjøre plass først (f.eks. tømme gamle observasjoner).');
+          if (kastBildet) {
+            delete obs.photo;
+            observations[idx] = obs;
+            lagret = saveObservations(observations);
+            if (lagret) {
+              alert(nyttBilde
+                ? 'Bildet var for stort til å lagres på denne enheten (tom lagringsplass). Resten av endringene er lagret, men uten bildet.'
+                : 'Endringene er lagret, men bildet måtte fjernes for å få plass.');
+            }
           }
         }
         if (!lagret) {

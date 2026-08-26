@@ -163,6 +163,42 @@ test.describe('Del-dialog: bilder', () => {
     expect(sentBody.observations[0].photo.length).toBeLessThan(storBilde.length);
   });
 
+  test('canvas som kaster henger ikke dialogen — delingen går uten bildet (regresjon)', async ({ page }) => {
+    // toDataURL kan kaste på iOS Safari under minnepress. Kastet skjer inne i
+    // img.onload, utenfor Promise-executoren, så feilen nådde aldri kallerens
+    // try/catch: løftet ble aldri settlet og knappen stod på «Lager lenke…»
+    // for godt. Nå skal bildet droppes og delingen fullføres uten det.
+    let sentBody: any = null;
+    await page.route('**/api/share', async (route: Route) => {
+      sentBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, slug: 'test-canvas-feil', url: '/d/test-canvas-feil', deleteKey: 'dk' }),
+      });
+    });
+
+    await page.addInitScript(() => {
+      HTMLCanvasElement.prototype.toDataURL = function () {
+        throw new Error('Simulert iOS-minnefeil i toDataURL');
+      };
+    });
+
+    await seed(page, [obs('Blåmeis', { photo: TEST_PHOTO })]);
+
+    await page.locator('#share-btn').click();
+    const modal = page.locator('#share-modal');
+    await expect(modal).toBeVisible();
+
+    await modal.locator('#share-create').click();
+    // Uten fiksen henger denne til testens timeout
+    await expect(modal.locator('#share-url')).toBeVisible({ timeout: 5000 });
+
+    expect(sentBody).not.toBeNull();
+    expect(sentBody.observations).toHaveLength(1);
+    expect(sentBody.observations[0]).not.toHaveProperty('photo');
+  });
+
   test('observasjon uten bilde påvirkes ikke ved sending (ingen photo-nøkkel)', async ({ page }) => {
     let sentBody: any = null;
     await page.route('**/api/share', async (route: Route) => {

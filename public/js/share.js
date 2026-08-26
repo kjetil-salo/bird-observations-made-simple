@@ -38,6 +38,10 @@ function formatDato(iso) {
   return `${dag}. ${mnd[m - 1]} ${aar}`;
 }
 
+// Tak per nedskaleringsforsøk. Et bilde som verken fyrer onload eller onerror
+// (avkortet data-URL) skal ikke låse delings-dialogen — heller droppe bildet.
+const BILDE_TIDSFRIST_MS = 10_000;
+
 /**
  * Lag en liten delings-thumbnail fra et allerede eksisterende bilde (data-URL).
  *
@@ -48,20 +52,44 @@ function formatDato(iso) {
  */
 function downscaleForShare(dataUrl, quality, maxSide) {
   return new Promise((resolve, reject) => {
+    // onload/onerror kjører etter at executoren er ferdig. Kaster noe der
+    // inne — getContext('2d') kan gi null og toDataURL kaste, begge kjent på
+    // iOS Safari under minnepress — havner feilen på window.onerror og løftet
+    // settles aldri. Da ble delings-knappen hengende på «Lager lenke…» for
+    // godt, uten at kallerens try/catch fikk se noe. Derfor: alt i try/catch,
+    // og en tidsfrist i tilfelle bildet verken laster eller feiler.
+    let ferdig = false;
+    const settle = (fn, verdi) => {
+      if (ferdig) return;
+      ferdig = true;
+      clearTimeout(frist);
+      fn(verdi);
+    };
+    const frist = setTimeout(
+      () => settle(reject, new Error('Tidsavbrudd ved nedskalering av bildet')),
+      BILDE_TIDSFRIST_MS
+    );
+
     const img = new Image();
     img.onload = () => {
-      let { width, height } = img;
-      if (width > maxSide || height > maxSide) {
-        if (width > height) { height = Math.round(height * maxSide / width); width = maxSide; }
-        else { width = Math.round(width * maxSide / height); height = maxSide; }
+      try {
+        let { width, height } = img;
+        if (width > maxSide || height > maxSide) {
+          if (width > height) { height = Math.round(height * maxSide / width); width = maxSide; }
+          else { width = Math.round(width * maxSide / height); height = maxSide; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Fikk ikke canvas-kontekst');
+        ctx.drawImage(img, 0, 0, width, height);
+        settle(resolve, canvas.toDataURL('image/jpeg', quality));
+      } catch (e) {
+        settle(reject, e instanceof Error ? e : new Error(String(e)));
       }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
     };
-    img.onerror = () => reject(new Error('Kunne ikke lese bildet'));
+    img.onerror = () => settle(reject, new Error('Kunne ikke lese bildet'));
     img.src = dataUrl;
   });
 }
