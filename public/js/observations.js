@@ -261,7 +261,7 @@ export function renderObservations(observations, obsListEl, buttons, saveState) 
     if (groupPlaceName) {
       const usePlaceBtn = document.createElement('button');
       usePlaceBtn.type = 'button';
-      usePlaceBtn.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 5 5v4"/></svg>';
+      usePlaceBtn.textContent = '↩';
       usePlaceBtn.setAttribute('aria-label', `Gå tilbake til besøket på ${groupPlaceName}`);
       usePlaceBtn.title = visitLocked
         ? `Gå tilbake til dette avsluttede besøket på ${groupPlaceName} — nye arter får besøkets klokkeslett`

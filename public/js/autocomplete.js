@@ -2,6 +2,23 @@
  * Autocomplete-modul for stedsnavn i etterregistreringsmodus
  */
 
+function isMineResult(result) {
+  return result?.isMine === true || result?.ColorString === '#ffff00';
+}
+
+/**
+ * Sorter lokasjonstreff slik at brukerens egne private lokasjoner prioriteres.
+ */
+export function sortLocationAutocompleteResults(results) {
+  return [...(results || [])].sort((a, b) => {
+    if ((isMineResult(a) ? 1 : 0) !== (isMineResult(b) ? 1 : 0)) return (isMineResult(b) ? 1 : 0) - (isMineResult(a) ? 1 : 0);
+    if ((a.isSuper ? 1 : 0) !== (b.isSuper ? 1 : 0)) return (b.isSuper ? 1 : 0) - (a.isSuper ? 1 : 0);
+    if ((a.isPrivate ? 1 : 0) !== (b.isPrivate ? 1 : 0)) return (a.isPrivate ? 1 : 0) - (b.isPrivate ? 1 : 0);
+    if (a._distance != null && b._distance != null) return a._distance - b._distance;
+    return 0;
+  });
+}
+
 /**
  * Initialiser autocomplete på stedsnavn-felt
  * KUN aktivt i etterregistreringsmodus
@@ -99,7 +116,7 @@ export function initAutocomplete(placeInput, onSelect, getPosition = null) {
         }));
       }
 
-      const results = data.results || [];
+      const results = sortLocationAutocompleteResults(data.results || []);
       currentResults = results;
 
       // Vis resultater (kan være fra lokal DB selv uten innlogging)
@@ -149,7 +166,7 @@ export function initAutocomplete(placeInput, onSelect, getPosition = null) {
       item.dataset.index = index;
 
       // Fargekoding
-      const isMine = result.ColorString === '#ffff00';
+      const isMine = isMineResult(result);
       const isSuper = result.isSuper === true;
       const isPrivate = result.isPrivate === true;
       const bgColor = isMine ? 'rgba(255, 255, 0, 0.15)' : isSuper ? 'rgba(59,130,246,0.07)' : 'rgba(0, 102, 0, 0.1)';

@@ -231,6 +231,27 @@ describe('toCsv', () => {
 });
 
 describe('renderObservations besøk', () => {
+  it('viser samme tilbake-ikon som hjelpesiden for tidligere besøk', () => {
+    const observations = [
+      {
+        species: { taxonName: 'Heilo' },
+        placeName: 'Herdla',
+        placeId: 42,
+        visitId: 'visit-morgen',
+        count: 20,
+        activity: 'Overflygende',
+        timestamp: '2026-07-03T08:00:00',
+      },
+    ];
+    const obsListEl = document.createElement('div');
+
+    renderObservations(observations, obsListEl, {}, vi.fn());
+
+    const usePlaceBtn = obsListEl.querySelector('.obs-group-place-btn');
+    expect(usePlaceBtn.textContent).toBe('↩');
+    expect(usePlaceBtn.getAttribute('aria-label')).toBe('Gå tilbake til besøket på Herdla');
+  });
+
   it('låser bare valgt besøk og lar samme lokalitet ha flere besøk', () => {
     const observations = [
       {
