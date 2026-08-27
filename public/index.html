@@ -311,20 +311,20 @@
 
     </div>
 
-    <script type="module" src="/js/main.js?v=20260128a"></script>
+    <script type="module" src="/js/main.js?v=v1.45.4"></script>
     <script type="module">
       // Registrer Service Worker for offline-støtte.
       // Versjonert URL: Cloudflare overstyrer origin sin max-age=300 med 4 timer, så
       // en endret /sw.js kan bli liggende i edge-cachen og aldri nå installerte apper.
-      // ?v=<VERSION> gir en ny cache-nøkkel ved hver release → garantert fersk henting.
-      import { VERSION } from './js/version.js';
+      // Bruk inline versjon her: /js/version.js kan selv være cachet i gammel versjon.
+      const VERSION = 'v1.45.4';
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register(`/sw.js?v=${VERSION}`).catch(() => {});
       }
     </script>
     <footer class="footer-credit">Versjon <span id="version"></span>  |  <a href="/changelog.html" style="color:var(--accent);text-decoration:none;">Endringslogg</a>  |  <a href="/feedback.html" style="color:var(--accent);text-decoration:none;">Gi tilbakemelding</a>  |  © 2026 Kjetil Salomonsen</footer>
     <script type="module">
-      import { VERSION } from './js/version.js';
+      const VERSION = 'v1.45.4';
       document.getElementById('version').textContent = VERSION;
     </script>
 
